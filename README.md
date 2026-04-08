@@ -3,7 +3,20 @@
 The first unified GCP emulator. One binary, four services, zero cloud bills.
 
 ```bash
-go install github.com/slokam-ai/localgcp@latest
+# Homebrew (macOS/Linux)
+brew install slokam-ai/tap/localgcp
+
+# Docker
+docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 ghcr.io/slokam-ai/localgcp
+
+# Pre-built binary
+# Download from https://github.com/slokam-ai/localgcp/releases
+
+# From source
+go install github.com/slokam-ai/localgcp/cmd/localgcp@latest
+```
+
+```bash
 localgcp up
 ```
 
