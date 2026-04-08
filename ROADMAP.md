@@ -20,7 +20,7 @@ Fill the gaps that matter most for real-world adoption.
 - [x] Distribution: goreleaser, GitHub Actions CI, Homebrew, Docker (v0.1.0)
 - [x] Firestore Store lock refactor + deep copy + race fix + 15 Store unit tests
 - [x] Firestore real-time listeners (`onSnapshot` / `Listen` streaming RPC)
-- [ ] Firestore `in`, `array-contains`, `array-contains-any` operators
+- [x] Firestore `in`, `not-in`, `array-contains`, `array-contains-any` operators
 - [ ] Pub/Sub push subscriptions (server POSTs to user endpoint)
 - [ ] Pub/Sub dead letter topic support
 - [ ] Cloud Tasks (queue/task CRUD, HTTP dispatch, scheduling)
