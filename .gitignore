@@ -1,5 +1,5 @@
-localgcp
-smoketest
+/localgcp
+/smoketest
 dist/
 .localgcp/
 *.exe
