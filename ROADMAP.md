@@ -13,17 +13,20 @@ Core services that cover ~80% of typical GCP dev workflows.
 - [x] Port conflict detection with clear error messages
 - [x] Request logging (default on, `--quiet` for CI)
 
-## Phase 2 — Compute and messaging gaps
+## Phase 2 — Depth + strategic expansion
 
 Fill the gaps that matter most for real-world adoption.
 
-- [ ] Pub/Sub push subscriptions (server POSTs to user endpoint)
+- [x] Distribution: goreleaser, GitHub Actions CI, Homebrew, Docker (v0.1.0)
+- [x] Firestore Store lock refactor + deep copy + race fix + 15 Store unit tests
 - [ ] Firestore real-time listeners (`onSnapshot` / `Listen` streaming RPC)
-- [ ] Cloud Tasks (queue with HTTP dispatch)
-- [ ] Eventarc (event routing)
-- [ ] GCS signed URLs
 - [ ] Firestore `in`, `array-contains`, `array-contains-any` operators
-- [ ] Firestore collection group queries
+- [ ] Pub/Sub push subscriptions (server POSTs to user endpoint)
+- [ ] Pub/Sub dead letter topic support
+- [ ] Cloud Tasks (queue/task CRUD, HTTP dispatch, scheduling)
+- [ ] GCS signed URLs
+- [ ] ~~Eventarc~~ (deferred to Phase 3, depends on Cloud Run)
+- [ ] ~~Firestore collection group queries~~ (deferred to Phase 3, complex indexing)
 
 ## Phase 3 — Security and observability
 
