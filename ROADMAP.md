@@ -21,8 +21,8 @@ Fill the gaps that matter most for real-world adoption.
 - [x] Firestore Store lock refactor + deep copy + race fix + 15 Store unit tests
 - [x] Firestore real-time listeners (`onSnapshot` / `Listen` streaming RPC)
 - [x] Firestore `in`, `not-in`, `array-contains`, `array-contains-any` operators
-- [ ] Pub/Sub push subscriptions (server POSTs to user endpoint)
-- [ ] Pub/Sub dead letter topic support
+- [x] Pub/Sub push subscriptions (server POSTs to user endpoint)
+- [x] Pub/Sub dead letter topic support
 - [ ] Cloud Tasks (queue/task CRUD, HTTP dispatch, scheduling)
 - [ ] GCS signed URLs
 - [ ] ~~Eventarc~~ (deferred to Phase 3, depends on Cloud Run)
