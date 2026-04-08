@@ -28,6 +28,16 @@ Fill the gaps that matter most for real-world adoption.
 - [ ] ~~Eventarc~~ (deferred to Phase 3, depends on Cloud Run)
 - [ ] ~~Firestore collection group queries~~ (deferred to Phase 3, complex indexing)
 
+## AI/ML Services
+
+- [x] Vertex AI Gemini API — generateContent + embeddings via Ollama proxy
+- [x] Stub backend for CI/CD (deterministic responses, no model needed)
+- [x] Model alias registry (gemini-2.5-flash -> llama3.2, etc.)
+- [ ] Streaming (streamGenerateContent) — Ollama NDJSON to Vertex SSE
+- [ ] Multi-provider backends (OpenAI, Anthropic adapters)
+- [ ] Tool/function calling support
+- [ ] Multimodal (image/audio input)
+
 ## Phase 3 — Security and observability
 
 - [ ] Cloud KMS (sign, verify, encrypt/decrypt with in-memory keys)
@@ -52,11 +62,11 @@ Tier 2 is activated with `localgcp up --high-fidelity` or `localgcp up --wrap=sp
 
 ## Distribution milestones
 
-- [ ] GitHub Releases with pre-built binaries (goreleaser)
-- [ ] Homebrew formula (`brew install localgcp`)
-- [ ] Docker image
-- [ ] GitHub Actions for CI/CD
-- [ ] Landing page at localgcp.com
+- [x] GitHub Releases with pre-built binaries (goreleaser)
+- [x] Homebrew cask (`brew install slokam-ai/tap/localgcp`)
+- [x] Docker multi-arch image (`ghcr.io/slokam-ai/localgcp`)
+- [x] GitHub Actions CI (test on push) + release (on tag)
+- [x] Landing page at localgcp.com
 
 ## Ideas (not committed)
 
