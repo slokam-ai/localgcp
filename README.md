@@ -69,7 +69,7 @@ localgcp emulates core GCP services locally so you can develop and test without 
 localgcp up
 ```
 
-All four services start in the foreground. Data lives in memory and vanishes when you stop. Press Ctrl+C to stop.
+All six services start in the foreground. Data lives in memory and vanishes when you stop. Press Ctrl+C to stop.
 
 For persistent data across restarts:
 
