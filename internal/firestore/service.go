@@ -141,17 +141,15 @@ func (fs *firestoreServer) CreateDocument(_ context.Context, req *firestorepb.Cr
 
 	name := parent + "/" + collectionID + "/" + docID
 
-	// Check if document already exists.
-	if fs.svc.store.GetDocument(name) != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "document %q already exists", name)
-	}
-
 	var fields map[string]*firestorepb.Value
 	if req.GetDocument() != nil {
 		fields = req.GetDocument().GetFields()
 	}
 
-	doc := fs.svc.store.CreateDocument(name, fields)
+	doc, ok := fs.svc.store.CreateDocument(name, fields)
+	if !ok {
+		return nil, status.Errorf(codes.AlreadyExists, "document %q already exists", name)
+	}
 	return doc, nil
 }
 

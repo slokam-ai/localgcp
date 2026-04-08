@@ -58,17 +58,33 @@ func (s *Store) getDocLocked(name string) *firestorepb.Document {
 	}
 	return &firestorepb.Document{
 		Name:       name,
-		Fields:     sd.Fields,
+		Fields:     copyFields(sd.Fields),
 		CreateTime: sd.CreateTime,
 		UpdateTime: sd.UpdateTime,
 	}
 }
 
-// CreateDocument creates a new document. Returns an error if it already exists.
-func (s *Store) CreateDocument(name string, fields map[string]*firestorepb.Value) *firestorepb.Document {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// copyFields returns a shallow copy of a Firestore fields map so that callers
+// cannot mutate the store's internal state after the lock is released.
+func copyFields(src map[string]*firestorepb.Value) map[string]*firestorepb.Value {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]*firestorepb.Value, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
 
+// CreateDocument creates a new document. Returns the document and true on
+// success, or nil and false if a document with that name already exists.
+func (s *Store) CreateDocument(name string, fields map[string]*firestorepb.Value) (*firestorepb.Document, bool) {
+	s.mu.Lock()
+	if _, exists := s.docs[name]; exists {
+		s.mu.Unlock()
+		return nil, false
+	}
 	now := timestamppb.Now()
 	sd := &storedDocument{
 		Fields:     fields,
@@ -76,8 +92,10 @@ func (s *Store) CreateDocument(name string, fields map[string]*firestorepb.Value
 		UpdateTime: now,
 	}
 	s.docs[name] = sd
+	doc := s.getDocLocked(name)
+	s.mu.Unlock()
 	s.persist()
-	return s.getDocLocked(name)
+	return doc, true
 }
 
 // UpdateDocument applies a full or partial update. If updateMask is nil or empty,
@@ -85,7 +103,6 @@ func (s *Store) CreateDocument(name string, fields map[string]*firestorepb.Value
 // Creates the document if it does not exist (upsert).
 func (s *Store) UpdateDocument(name string, fields map[string]*firestorepb.Value, updateMask []string) *firestorepb.Document {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	now := timestamppb.Now()
 	existing, ok := s.docs[name]
@@ -97,8 +114,10 @@ func (s *Store) UpdateDocument(name string, fields map[string]*firestorepb.Value
 			UpdateTime: now,
 		}
 		s.docs[name] = sd
+		doc := s.getDocLocked(name)
+		s.mu.Unlock()
 		s.persist()
-		return s.getDocLocked(name)
+		return doc
 	}
 
 	if len(updateMask) == 0 {
@@ -118,20 +137,21 @@ func (s *Store) UpdateDocument(name string, fields map[string]*firestorepb.Value
 		}
 	}
 	existing.UpdateTime = now
-
+	doc := s.getDocLocked(name)
+	s.mu.Unlock()
 	s.persist()
-	return s.getDocLocked(name)
+	return doc
 }
 
 // DeleteDocument removes a document. Returns false if it did not exist.
 func (s *Store) DeleteDocument(name string) bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if _, ok := s.docs[name]; !ok {
+		s.mu.Unlock()
 		return false
 	}
 	delete(s.docs, name)
+	s.mu.Unlock()
 	s.persist()
 	return true
 }
