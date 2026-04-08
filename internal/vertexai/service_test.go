@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -43,7 +44,12 @@ func testServer(t *testing.T) (string, func()) {
 }
 
 // TestSDKGenerateContent is the thesis validation: google.golang.org/genai talks to localhost.
+// Requires GCP default credentials (the SDK checks even with custom BaseURL).
+// Skipped in CI where no credentials exist.
 func TestSDKGenerateContent(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping SDK test in CI: no GCP credentials")
+	}
 	base, cleanup := testServer(t)
 	defer cleanup()
 
@@ -81,6 +87,9 @@ func TestSDKGenerateContent(t *testing.T) {
 }
 
 func TestSDKEmbedContent(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping SDK test in CI: no GCP credentials")
+	}
 	base, cleanup := testServer(t)
 	defer cleanup()
 
