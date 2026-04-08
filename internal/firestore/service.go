@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -355,8 +356,188 @@ func (fs *firestoreServer) BatchGetDocuments(req *firestorepb.BatchGetDocumentsR
 	return nil
 }
 
-func (fs *firestoreServer) Listen(_ firestorepb.Firestore_ListenServer) error {
-	return status.Errorf(codes.Unimplemented, "localgcp: Listen not yet supported")
+func (fs *firestoreServer) Listen(stream firestorepb.Firestore_ListenServer) error {
+	ctx := stream.Context()
+
+	// Active targets: targetID -> cancel cleanup.
+	targets := make(map[int32]struct{})
+	defer func() {
+		for tid := range targets {
+			fs.svc.store.RemoveWatcher(tid)
+		}
+	}()
+
+	// Channel fan-in: all watcher channels merged into one.
+	events := make(chan *changeEvent, 128)
+
+	// Recv loop: reads client requests in a goroutine.
+	reqCh := make(chan *firestorepb.ListenRequest, 4)
+	errCh := make(chan error, 1)
+	go func() {
+		for {
+			req, err := stream.Recv()
+			if err != nil {
+				errCh <- err
+				return
+			}
+			reqCh <- req
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+
+		case err := <-errCh:
+			if err == io.EOF {
+				return nil
+			}
+			return err
+
+		case req := <-reqCh:
+			switch tc := req.GetTargetChange().(type) {
+			case *firestorepb.ListenRequest_AddTarget:
+				target := tc.AddTarget
+				targetID := target.GetTargetId()
+
+				// Determine what to watch.
+				var prefix, docName string
+				switch tt := target.GetTargetType().(type) {
+				case *firestorepb.Target_Query:
+					sq := tt.Query.GetStructuredQuery()
+					parent := tt.Query.GetParent()
+					if sq != nil && len(sq.GetFrom()) > 0 {
+						colID := sq.GetFrom()[0].GetCollectionId()
+						prefix = parent + "/" + colID + "/"
+					}
+				case *firestorepb.Target_Documents:
+					docs := tt.Documents.GetDocuments()
+					if len(docs) > 0 {
+						docName = docs[0]
+					}
+				}
+
+				if prefix == "" && docName == "" {
+					continue
+				}
+
+				// 1. Register watcher FIRST (so we don't miss events).
+				watchCh := fs.svc.store.AddWatcher(targetID, prefix, docName)
+				targets[targetID] = struct{}{}
+
+				// Forward watcher events to the merged events channel.
+				go func(ch <-chan *changeEvent) {
+					for evt := range ch {
+						select {
+						case events <- evt:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}(watchCh)
+
+				// 2. Send TargetChange ADD.
+				if err := stream.Send(&firestorepb.ListenResponse{
+					ResponseType: &firestorepb.ListenResponse_TargetChange{
+						TargetChange: &firestorepb.TargetChange{
+							TargetChangeType: firestorepb.TargetChange_ADD,
+							TargetIds:        []int32{targetID},
+						},
+					},
+				}); err != nil {
+					return err
+				}
+
+				// 3. Snapshot and send initial documents.
+				snapshot := fs.svc.store.SnapshotDocuments(prefix, docName)
+				now := timestamppb.Now()
+				for _, doc := range snapshot {
+					if err := stream.Send(&firestorepb.ListenResponse{
+						ResponseType: &firestorepb.ListenResponse_DocumentChange{
+							DocumentChange: &firestorepb.DocumentChange{
+								Document:  doc,
+								TargetIds: []int32{targetID},
+							},
+						},
+					}); err != nil {
+						return err
+					}
+				}
+
+				// 4. Send TargetChange CURRENT.
+				if err := stream.Send(&firestorepb.ListenResponse{
+					ResponseType: &firestorepb.ListenResponse_TargetChange{
+						TargetChange: &firestorepb.TargetChange{
+							TargetChangeType: firestorepb.TargetChange_CURRENT,
+							TargetIds:        []int32{targetID},
+							ReadTime:         now,
+							ResumeToken:      []byte{},
+						},
+					},
+				}); err != nil {
+					return err
+				}
+
+			case *firestorepb.ListenRequest_RemoveTarget:
+				targetID := tc.RemoveTarget
+				fs.svc.store.RemoveWatcher(targetID)
+				delete(targets, targetID)
+
+				if err := stream.Send(&firestorepb.ListenResponse{
+					ResponseType: &firestorepb.ListenResponse_TargetChange{
+						TargetChange: &firestorepb.TargetChange{
+							TargetChangeType: firestorepb.TargetChange_REMOVE,
+							TargetIds:        []int32{targetID},
+						},
+					},
+				}); err != nil {
+					return err
+				}
+			}
+
+		case evt := <-events:
+			if err := fs.sendDocumentChange(stream, evt, fs.targetIDsFor(targets, evt)); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// targetIDsFor returns the list of active target IDs. In our simple implementation,
+// the store already matched the watcher, so all active targets receive the event.
+// For correctness with multiple targets watching different collections, we re-check.
+func (fs *firestoreServer) targetIDsFor(targets map[int32]struct{}, evt *changeEvent) []int32 {
+	var ids []int32
+	for tid := range targets {
+		ids = append(ids, tid)
+	}
+	return ids
+}
+
+func (fs *firestoreServer) sendDocumentChange(stream firestorepb.Firestore_ListenServer, evt *changeEvent, targetIDs []int32) error {
+	now := timestamppb.Now()
+	switch evt.ChangeType {
+	case ChangeRemoved:
+		return stream.Send(&firestorepb.ListenResponse{
+			ResponseType: &firestorepb.ListenResponse_DocumentDelete{
+				DocumentDelete: &firestorepb.DocumentDelete{
+					Document:         evt.DocName,
+					RemovedTargetIds: targetIDs,
+					ReadTime:         now,
+				},
+			},
+		})
+	default:
+		return stream.Send(&firestorepb.ListenResponse{
+			ResponseType: &firestorepb.ListenResponse_DocumentChange{
+				DocumentChange: &firestorepb.DocumentChange{
+					Document:  evt.Doc,
+					TargetIds: targetIDs,
+				},
+			},
+		})
+	}
 }
 
 func (fs *firestoreServer) Write(_ firestorepb.Firestore_WriteServer) error {

@@ -22,24 +22,135 @@ type storedDocument struct {
 	UpdateTime *timestamppb.Timestamp
 }
 
+// ChangeType identifies the kind of document mutation.
+type ChangeType int
+
+const (
+	ChangeAdded    ChangeType = iota
+	ChangeModified
+	ChangeRemoved
+)
+
+// changeEvent is sent to watchers when a document is mutated.
+type changeEvent struct {
+	DocName    string
+	ChangeType ChangeType
+	Doc        *firestorepb.Document // nil for ChangeRemoved
+}
+
+// watcher represents a registered listener on a collection or document.
+type watcher struct {
+	targetID int32
+	prefix   string // collection prefix (e.g. ".../documents/col/") for collection targets
+	docName  string // specific document name for document targets
+	ch       chan *changeEvent
+}
+
+// matches returns true if a document mutation at name should be delivered to this watcher.
+func (w *watcher) matches(name string) bool {
+	if w.docName != "" {
+		return name == w.docName
+	}
+	if w.prefix != "" {
+		if !strings.HasPrefix(name, w.prefix) {
+			return false
+		}
+		// Only direct children: no "/" in the rest after prefix.
+		rest := name[len(w.prefix):]
+		return !strings.Contains(rest, "/")
+	}
+	return false
+}
+
 // Store is an in-memory hierarchical document store with optional JSON persistence.
 type Store struct {
 	mu   sync.RWMutex
 	docs map[string]*storedDocument // full document path -> document
 	dir  string                     // persistence directory; empty = in-memory only
+
+	watchMu  sync.Mutex
+	watchers map[int32]*watcher
 }
 
 // NewStore creates a new document store. If dir is non-empty, state is loaded
 // from disk and flushed on every write.
 func NewStore(dir string) *Store {
 	s := &Store{
-		docs: make(map[string]*storedDocument),
-		dir:  dir,
+		docs:     make(map[string]*storedDocument),
+		dir:      dir,
+		watchers: make(map[int32]*watcher),
 	}
 	if dir != "" {
 		s.load()
 	}
 	return s
+}
+
+// AddWatcher registers a listener and returns a channel for change events.
+// For collection targets, prefix should be "parent/collectionID/" and docName empty.
+// For document targets, docName should be the full document path and prefix empty.
+func (s *Store) AddWatcher(targetID int32, prefix, docName string) <-chan *changeEvent {
+	ch := make(chan *changeEvent, 64)
+	s.watchMu.Lock()
+	s.watchers[targetID] = &watcher{
+		targetID: targetID,
+		prefix:   prefix,
+		docName:  docName,
+		ch:       ch,
+	}
+	s.watchMu.Unlock()
+	return ch
+}
+
+// RemoveWatcher deregisters a listener and closes its channel.
+func (s *Store) RemoveWatcher(targetID int32) {
+	s.watchMu.Lock()
+	if w, ok := s.watchers[targetID]; ok {
+		close(w.ch)
+		delete(s.watchers, targetID)
+	}
+	s.watchMu.Unlock()
+}
+
+// notifyWatchers sends a change event to all matching watchers.
+// Must be called AFTER releasing mu.
+func (s *Store) notifyWatchers(name string, ct ChangeType, doc *firestorepb.Document) {
+	evt := &changeEvent{DocName: name, ChangeType: ct, Doc: doc}
+	s.watchMu.Lock()
+	for _, w := range s.watchers {
+		if w.matches(name) {
+			select {
+			case w.ch <- evt:
+			default: // non-blocking: drop if consumer is too slow
+			}
+		}
+	}
+	s.watchMu.Unlock()
+}
+
+// SnapshotDocuments returns copies of all documents matching either a
+// collection prefix or a specific document name, while holding the read lock.
+// The watcher should be registered BEFORE calling this to avoid missing events.
+func (s *Store) SnapshotDocuments(prefix, docName string) []*firestorepb.Document {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if docName != "" {
+		doc := s.getDocLocked(docName)
+		if doc != nil {
+			return []*firestorepb.Document{doc}
+		}
+		return nil
+	}
+
+	var docs []*firestorepb.Document
+	for name := range s.docs {
+		if strings.HasPrefix(name, prefix) && !strings.Contains(name[len(prefix):], "/") {
+			docs = append(docs, s.getDocLocked(name))
+		}
+	}
+	sort.Slice(docs, func(i, j int) bool { return docs[i].Name < docs[j].Name })
+	return docs
 }
 
 // --- Document CRUD ---
@@ -95,6 +206,7 @@ func (s *Store) CreateDocument(name string, fields map[string]*firestorepb.Value
 	doc := s.getDocLocked(name)
 	s.mu.Unlock()
 	s.persist()
+	s.notifyWatchers(name, ChangeAdded, doc)
 	return doc, true
 }
 
@@ -117,6 +229,7 @@ func (s *Store) UpdateDocument(name string, fields map[string]*firestorepb.Value
 		doc := s.getDocLocked(name)
 		s.mu.Unlock()
 		s.persist()
+		s.notifyWatchers(name, ChangeAdded, doc)
 		return doc
 	}
 
@@ -140,6 +253,7 @@ func (s *Store) UpdateDocument(name string, fields map[string]*firestorepb.Value
 	doc := s.getDocLocked(name)
 	s.mu.Unlock()
 	s.persist()
+	s.notifyWatchers(name, ChangeModified, doc)
 	return doc
 }
 
@@ -153,6 +267,7 @@ func (s *Store) DeleteDocument(name string) bool {
 	delete(s.docs, name)
 	s.mu.Unlock()
 	s.persist()
+	s.notifyWatchers(name, ChangeRemoved, nil)
 	return true
 }
 
