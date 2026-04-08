@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/slokam-ai/localgcp/internal/auth"
+	"github.com/slokam-ai/localgcp/internal/cloudtasks"
 	"github.com/slokam-ai/localgcp/internal/firestore"
 	"github.com/slokam-ai/localgcp/internal/gcs"
 	"github.com/slokam-ai/localgcp/internal/pubsub"
@@ -50,6 +51,7 @@ func upCmd() *cobra.Command {
 			srv.Register(pubsub.New(cfg.DataDir, cfg.Quiet), cfg.PortPubSub)
 			srv.Register(secretmanager.New(cfg.DataDir, cfg.Quiet), cfg.PortSecretManager)
 			srv.Register(firestore.New(cfg.DataDir, cfg.Quiet), cfg.PortFirestore)
+			srv.Register(cloudtasks.New(cfg.DataDir, cfg.Quiet), cfg.PortCloudTasks)
 
 			return srv.Run()
 		},
@@ -60,13 +62,14 @@ func upCmd() *cobra.Command {
 	cmd.Flags().IntVar(&cfg.PortPubSub, "port-pubsub", cfg.PortPubSub, "Port for Pub/Sub")
 	cmd.Flags().IntVar(&cfg.PortSecretManager, "port-secretmanager", cfg.PortSecretManager, "Port for Secret Manager")
 	cmd.Flags().IntVar(&cfg.PortFirestore, "port-firestore", cfg.PortFirestore, "Port for Firestore")
+	cmd.Flags().IntVar(&cfg.PortCloudTasks, "port-cloudtasks", cfg.PortCloudTasks, "Port for Cloud Tasks")
 	cmd.Flags().BoolVarP(&cfg.Quiet, "quiet", "q", false, "Suppress request logging (for CI)")
 
 	return cmd
 }
 
 func envCmd() *cobra.Command {
-	var portGCS, portPubSub, portFirestore, portSecretManager int
+	var portGCS, portPubSub, portFirestore, portSecretManager, portCloudTasks int
 
 	cmd := &cobra.Command{
 		Use:   "env",
@@ -83,10 +86,19 @@ func envCmd() *cobra.Command {
 			}
 
 			fmt.Println()
-			fmt.Println("# Secret Manager has no _EMULATOR_HOST env var.")
+			fmt.Println("# Secret Manager and Cloud Tasks have no _EMULATOR_HOST env var.")
 			fmt.Println("# Configure your client manually. Example (Go):")
+			fmt.Println("#")
+			fmt.Println("# Secret Manager:")
 			fmt.Println("#   client, _ := secretmanager.NewClient(ctx,")
 			fmt.Printf("#     option.WithEndpoint(\"localhost:%d\"),\n", portSecretManager)
+			fmt.Println("#     option.WithoutAuthentication(),")
+			fmt.Println("#     option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),")
+			fmt.Println("#   )")
+			fmt.Println("#")
+			fmt.Println("# Cloud Tasks:")
+			fmt.Println("#   client, _ := cloudtasks.NewClient(ctx,")
+			fmt.Printf("#     option.WithEndpoint(\"localhost:%d\"),\n", portCloudTasks)
 			fmt.Println("#     option.WithoutAuthentication(),")
 			fmt.Println("#     option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),")
 			fmt.Println("#   )")
@@ -100,6 +112,7 @@ func envCmd() *cobra.Command {
 	cmd.Flags().IntVar(&portPubSub, "port-pubsub", cfg.PortPubSub, "Port for Pub/Sub")
 	cmd.Flags().IntVar(&portFirestore, "port-firestore", cfg.PortFirestore, "Port for Firestore")
 	cmd.Flags().IntVar(&portSecretManager, "port-secretmanager", cfg.PortSecretManager, "Port for Secret Manager")
+	cmd.Flags().IntVar(&portCloudTasks, "port-cloudtasks", cfg.PortCloudTasks, "Port for Cloud Tasks")
 
 	return cmd
 }

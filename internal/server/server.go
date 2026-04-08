@@ -18,6 +18,7 @@ type Config struct {
 	PortPubSub        int
 	PortSecretManager int
 	PortFirestore     int
+	PortCloudTasks    int
 	DataDir           string
 	Quiet             bool
 }
@@ -29,6 +30,7 @@ func DefaultConfig() Config {
 		PortPubSub:        8085,
 		PortSecretManager: 8086,
 		PortFirestore:     8088,
+		PortCloudTasks:    8089,
 	}
 }
 
@@ -157,6 +159,8 @@ func portFlagName(serviceName string) string {
 		return "--port-secretmanager"
 	case "Firestore":
 		return "--port-firestore"
+	case "Cloud Tasks":
+		return "--port-cloudtasks"
 	default:
 		return "--port-*"
 	}
