@@ -2,10 +2,34 @@
 
 The first unified GCP emulator. One binary, six services, zero cloud bills.
 
+**Now with Vertex AI.** Run your `google.golang.org/genai` code against local LLMs via Ollama. Zero code changes, real inference, no API keys.
+
 ```bash
-# Homebrew (macOS/Linux)
+# Install
 brew install slokam-ai/tap/localgcp
 
+# Start (with Ollama for AI)
+localgcp up --vertex-model-map="gemini-2.5-flash=gemma3"
+
+# Your GCP code works unchanged
+eval $(localgcp env)
+```
+
+```go
+// Your existing Vertex AI code — just point BaseURL to localgcp
+client, _ := genai.NewClient(ctx, &genai.ClientConfig{
+    Project: "my-project", Location: "us-central1",
+    Backend: genai.BackendVertexAI,
+    HTTPOptions: genai.HTTPOptions{BaseURL: "http://localhost:8090"},
+})
+resp, _ := client.Models.GenerateContent(ctx, "gemini-2.5-flash",
+    genai.Text("Explain quantum computing"), nil)
+// Response comes from Gemma/Llama running locally via Ollama
+```
+
+Also available via Docker and pre-built binaries:
+
+```bash
 # Docker
 docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 -p 8089:8089 -p 8090:8090 ghcr.io/slokam-ai/localgcp
 
@@ -16,11 +40,13 @@ docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 -p 8089:8089
 go install github.com/slokam-ai/localgcp/cmd/localgcp@latest
 ```
 
-```bash
-localgcp up
-```
-
 That's it. Your GCP client libraries now talk to localhost instead of Google Cloud.
+
+## Why Vertex AI locally?
+
+Every Vertex AI API call costs money. Every prompt iteration, every integration test, every debug session. localgcp lets you run your GCP AI code against Gemma, Llama, or any Ollama model running on your machine. The official `google.golang.org/genai` SDK works unchanged, just set the `BaseURL` to localgcp. No API keys, no quotas, no bills.
+
+Without Ollama running, localgcp returns deterministic stub responses, perfect for CI/CD pipelines that need to test Vertex AI integration code without burning credits or leaking API keys.
 
 ## What it does
 
