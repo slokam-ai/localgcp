@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Storage - localgcp docs</title>
+  <meta name="description" content="Emulate Google Cloud Storage locally. Bucket CRUD, uploads, downloads, signed URLs.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root,
+    [data-theme="dark"] {
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #141414;
+      --bg-card: #1a1a1a;
+      --bg-card-hover: #222222;
+      --border: #222222;
+      --border-light: #333333;
+      --text-primary: #e8e8e8;
+      --text-secondary: #999999;
+      --text-muted: #666666;
+      --text-dim: #444444;
+      --saffron: #C4841D;
+      --saffron-dim: #5a3a0a;
+      --saffron-glow: rgba(196, 132, 29, 0.15);
+      --saffron-hover: #d4941d;
+      --code-bg: #1a1a1a;
+      --code-border: #2a2a2a;
+      --accent-green: #28c840;
+      --accent-blue: #4a9eff;
+      --sidebar-bg: #111111;
+      --sidebar-active: rgba(196, 132, 29, 0.1);
+    }
+    [data-theme="light"] {
+      --bg-primary: #f8f6f2;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f0ede8;
+      --border: #e0dbd3;
+      --border-light: #d4cfc7;
+      --text-primary: #1a1a1a;
+      --text-secondary: #555555;
+      --text-muted: #888888;
+      --text-dim: #aaaaaa;
+      --saffron: #8B5E1A;
+      --saffron-dim: #E8D5B0;
+      --saffron-glow: rgba(139, 94, 26, 0.1);
+      --saffron-hover: #a06f20;
+      --code-bg: #f0ede8;
+      --code-border: #d4cfc7;
+      --accent-green: #1a8a2e;
+      --accent-blue: #2563eb;
+      --sidebar-bg: #f0ede8;
+      --sidebar-active: rgba(139, 94, 26, 0.08);
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 16px; scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: 'Space Grotesk', -apple-system, sans-serif;
+      background: var(--bg-primary); color: var(--text-primary);
+      line-height: 1.7; transition: background 0.3s ease, color 0.3s ease;
+    }
+    a { color: var(--saffron); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--saffron-hover); }
+    h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; font-weight: 400; line-height: 1.3; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: var(--bg-primary); border-bottom: 1px solid var(--border); transition: background 0.3s ease; }
+    .nav-inner { max-width: 100%; margin: 0; padding: 0 1.5rem; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-left { display: flex; align-items: center; gap: 1rem; }
+    .logo { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 500; letter-spacing: 2px; color: var(--text-primary); text-decoration: none; }
+    .logo span { color: var(--saffron); }
+    .nav-right { display: flex; align-items: center; gap: 1.25rem; }
+    .nav-link { font-size: 0.8rem; color: var(--text-secondary); letter-spacing: 0.5px; }
+    .nav-link:hover { color: var(--text-primary); }
+    .theme-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; transition: color 0.2s, border-color 0.2s; }
+    .theme-toggle:hover { color: var(--text-primary); border-color: var(--border-light); }
+    [data-theme="dark"] .icon-sun { display: block; } [data-theme="dark"] .icon-moon { display: none; }
+    [data-theme="light"] .icon-sun { display: none; } [data-theme="light"] .icon-moon { display: block; }
+    .menu-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; cursor: pointer; color: var(--text-muted); font-size: 1.1rem; transition: color 0.2s; }
+    .menu-toggle:hover { color: var(--text-primary); }
+    .layout { display: flex; padding-top: 56px; min-height: 100vh; }
+    .sidebar { width: 240px; min-width: 240px; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 1.5rem 0; position: fixed; top: 56px; bottom: 0; overflow-y: auto; transition: background 0.3s ease, transform 0.3s ease; }
+    .sidebar-section { padding: 0 1.25rem; margin-bottom: 1.5rem; }
+    .sidebar-label { font-size: 0.65rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .sidebar-link { display: block; padding: 0.35rem 1.25rem; font-size: 0.8rem; color: var(--text-secondary); transition: color 0.15s, background 0.15s; border-left: 2px solid transparent; }
+    .sidebar-link:hover { color: var(--text-primary); background: var(--sidebar-active); }
+    .sidebar-link.active { color: var(--saffron); border-left-color: var(--saffron); background: var(--sidebar-active); }
+    .content { flex: 1; margin-left: 240px; padding: 2.5rem 3rem 4rem; max-width: 800px; }
+    .content h1 { font-size: 2.25rem; margin-bottom: 0.5rem; }
+    .content h2 { font-size: 1.5rem; margin-top: 2.5rem; margin-bottom: 0.75rem; }
+    .content h3 { font-size: 1.15rem; margin-top: 1.75rem; margin-bottom: 0.5rem; font-family: 'Space Grotesk', sans-serif; font-weight: 600; }
+    .content p { color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.925rem; }
+    .content ul, .content ol { color: var(--text-secondary); margin-bottom: 1rem; padding-left: 1.5rem; font-size: 0.925rem; }
+    .content li { margin-bottom: 0.35rem; }
+    .content strong { color: var(--text-primary); }
+    .subtitle { font-size: 1rem; color: var(--text-secondary); margin-bottom: 2rem; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; }
+    pre.code-block { background: #0e0e0e; border: 1px solid var(--code-border); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; overflow-x: auto; font-size: 0.8rem; line-height: 1.8; color: #cccccc; }
+    [data-theme="light"] pre.code-block { background: #1a1a1a; color: #cccccc; }
+    pre.code-block .prompt { color: var(--saffron); font-weight: 500; }
+    pre.code-block .comment { color: #555555; }
+    pre.code-block .keyword { color: #4a9eff; }
+    pre.code-block .string { color: #28c840; }
+    pre.code-block .func { color: #d4941d; }
+    pre.code-block .type { color: #c792ea; }
+    code:not([class]) { background: var(--code-bg); border: 1px solid var(--code-border); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.8rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.25rem; font-size: 0.85rem; }
+    th { text-align: left; padding: 0.6rem 1rem; border-bottom: 2px solid var(--border); font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: var(--text-primary); font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase; }
+    td { padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+    td code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.75rem; }
+    .callout { background: var(--saffron-glow); border: 1px solid var(--saffron-dim); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; font-size: 0.875rem; color: var(--text-primary); line-height: 1.6; }
+    .callout strong { color: var(--saffron); }
+    @media (max-width: 768px) {
+      .menu-toggle { display: block; }
+      .sidebar { transform: translateX(-100%); z-index: 99; width: 260px; min-width: 260px; }
+      .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.3); }
+      .content { margin-left: 0; padding: 2rem 1.5rem 3rem; }
+    }
+    @media (max-width: 480px) {
+      .content { padding: 1.5rem 1rem 2rem; }
+      .content h1 { font-size: 1.75rem; }
+      pre.code-block { font-size: 0.72rem; padding: 0.75rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-inner">
+      <div class="nav-left">
+        <button class="menu-toggle" id="menu-toggle" aria-label="Toggle sidebar">&#9776;</button>
+        <a href="/" class="logo"><span>&gt;</span> localgcp</a>
+      </div>
+      <div class="nav-right">
+        <a href="/docs/" class="nav-link">Docs</a>
+        <a href="https://github.com/slokam-ai/localgcp" class="nav-link">GitHub</a>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section"><div class="sidebar-label">Getting Started</div></div>
+      <a href="/docs/" class="sidebar-link">Getting Started</a>
+      <div class="sidebar-section" style="margin-top:1rem"><div class="sidebar-label">Services</div></div>
+      <a href="/docs/vertex-ai.html" class="sidebar-link">Vertex AI</a>
+      <a href="/docs/cloud-storage.html" class="sidebar-link active">Cloud Storage</a>
+      <a href="/docs/pubsub.html" class="sidebar-link">Pub/Sub</a>
+      <a href="/docs/firestore.html" class="sidebar-link">Firestore</a>
+      <a href="/docs/secret-manager.html" class="sidebar-link">Secret Manager</a>
+      <a href="/docs/cloud-tasks.html" class="sidebar-link">Cloud Tasks</a>
+    </aside>
+
+    <main class="content">
+      <h1>Cloud Storage</h1>
+      <div class="subtitle">REST &middot; port 4443</div>
+
+      <h2>Configuration</h2>
+
+      <p>Set the emulator host environment variable:</p>
+<pre class="code-block"><span class="prompt">$</span> export STORAGE_EMULATOR_HOST=localhost:4443
+<span class="comment"># or use: eval $(localgcp env)</span></pre>
+
+      <p>The Go, Python, Java, and Node.js Cloud Storage client libraries all respect this env var and will connect to localgcp automatically.</p>
+
+      <h2>Go SDK example</h2>
+
+      <p>Create a bucket, upload an object, and download it:</p>
+<pre class="code-block"><span class="keyword">package</span> main
+
+<span class="keyword">import</span> (
+    <span class="string">"context"</span>
+    <span class="string">"fmt"</span>
+    <span class="string">"io"</span>
+    <span class="string">"log"</span>
+
+    <span class="string">"cloud.google.com/go/storage"</span>
+)
+
+<span class="keyword">func</span> <span class="func">main</span>() {
+    ctx := context.<span class="func">Background</span>()
+
+    <span class="comment">// STORAGE_EMULATOR_HOST=localhost:4443 must be set</span>
+    client, err := storage.<span class="func">NewClient</span>(ctx)
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+    <span class="keyword">defer</span> client.<span class="func">Close</span>()
+
+    bucket := client.<span class="func">Bucket</span>(<span class="string">"my-bucket"</span>)
+
+    <span class="comment">// Create bucket</span>
+    <span class="keyword">if</span> err := bucket.<span class="func">Create</span>(ctx, <span class="string">"my-project"</span>, <span class="keyword">nil</span>); err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+
+    <span class="comment">// Upload an object</span>
+    w := bucket.<span class="func">Object</span>(<span class="string">"hello.txt"</span>).<span class="func">NewWriter</span>(ctx)
+    fmt.<span class="func">Fprint</span>(w, <span class="string">"Hello, localgcp!"</span>)
+    <span class="keyword">if</span> err := w.<span class="func">Close</span>(); err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+
+    <span class="comment">// Download the object</span>
+    r, err := bucket.<span class="func">Object</span>(<span class="string">"hello.txt"</span>).<span class="func">NewReader</span>(ctx)
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+    <span class="keyword">defer</span> r.<span class="func">Close</span>()
+
+    data, _ := io.<span class="func">ReadAll</span>(r)
+    fmt.<span class="func">Println</span>(<span class="func">string</span>(data)) <span class="comment">// "Hello, localgcp!"</span>
+}</pre>
+
+      <h2>Features</h2>
+
+      <ul>
+        <li><strong>Bucket CRUD</strong> -- create, get, list, delete buckets</li>
+        <li><strong>Object upload</strong> -- simple, multipart, and resumable uploads</li>
+        <li><strong>Object download</strong> -- full content or range reads</li>
+        <li><strong>Object operations</strong> -- metadata, delete, copy</li>
+        <li><strong>Object listing</strong> -- with prefix and delimiter (directory-like browsing)</li>
+        <li><strong>Signed URLs</strong> -- generate and use signed download URLs</li>
+        <li><strong>API compatibility</strong> -- both JSON API and XML API paths</li>
+      </ul>
+
+      <h2>Signed URLs</h2>
+
+      <p>localgcp provides a signed URL endpoint for generating pre-signed download URLs:</p>
+<pre class="code-block"><span class="prompt">$</span> curl -X POST http://localhost:4443/_localgcp/sign \
+    -H <span class="string">"Content-Type: application/json"</span> \
+    -d <span class="string">'{"bucket":"my-bucket","object":"hello.txt","ttl_seconds":3600}'</span></pre>
+
+      <p>The response contains a signed URL you can use to download the object without authentication. This is useful for testing pre-signed URL flows in your application.</p>
+
+      <h2>Persistence</h2>
+
+      <p>By default, all objects are stored in memory. Use <code>--data-dir</code> to persist bucket and object data across restarts:</p>
+<pre class="code-block"><span class="prompt">$</span> localgcp up --data-dir=./.localgcp</pre>
+
+      <p>Object data and metadata are stored as files in <code>.localgcp/gcs/</code>.</p>
+
+      <h2>Not yet supported</h2>
+
+      <ul>
+        <li>Bucket versioning</li>
+        <li>Object compose</li>
+        <li>IAM policies</li>
+        <li>Notifications</li>
+      </ul>
+
+    </main>
+  </div>
+
+  <script>
+    const toggle = document.getElementById('theme-toggle');
+    const html = document.documentElement;
+    const stored = localStorage.getItem('theme');
+    if (stored) html.setAttribute('data-theme', stored);
+    toggle.addEventListener('click', () => {
+      const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+    const menuToggle = document.getElementById('menu-toggle');
+    const sidebar = document.getElementById('sidebar');
+    menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+    document.querySelector('.content').addEventListener('click', () => sidebar.classList.remove('open'));
+  </script>
+
+</body>
+</html>
