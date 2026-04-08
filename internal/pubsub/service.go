@@ -2,6 +2,8 @@ package pubsub
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub/apiv1/pubsubpb"
+	"github.com/slokam-ai/localgcp/internal/dispatch"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
@@ -23,10 +26,11 @@ type Service struct {
 	pubsubpb.UnimplementedPublisherServer
 	pubsubpb.UnimplementedSubscriberServer
 
-	dataDir string
-	quiet   bool
-	logger  *log.Logger
-	store   *Store
+	dataDir    string
+	quiet      bool
+	logger     *log.Logger
+	store      *Store
+	dispatcher *dispatch.Dispatcher
 }
 
 // New creates a new Pub/Sub service.
@@ -37,6 +41,13 @@ func New(dataDir string, quiet bool) *Service {
 		quiet:   quiet,
 		logger:  logger,
 		store:   NewStore(dataDir),
+		dispatcher: dispatch.New(dispatch.Config{
+			MaxRetries:     3,
+			InitialBackoff: 1 * time.Second,
+			Multiplier:     2.0,
+			MaxBackoff:     10 * time.Second,
+			Timeout:        30 * time.Second,
+		}),
 	}
 }
 
@@ -55,6 +66,9 @@ func (s *Service) Start(ctx context.Context, addr string) error {
 		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 
+	// Start push delivery goroutine.
+	go s.pushDeliveryLoop(ctx)
+
 	go func() {
 		<-ctx.Done()
 		srv.GracefulStop()
@@ -65,6 +79,66 @@ func (s *Service) Start(ctx context.Context, addr string) error {
 	}
 	return nil
 }
+
+// pushDeliveryLoop polls push subscriptions and dispatches messages via HTTP.
+func (s *Service) pushDeliveryLoop(ctx context.Context) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			for _, sub := range s.store.PushSubscriptions() {
+				msgs := s.store.PullAllUndelivered(sub.Name)
+				for _, m := range msgs {
+					s.pushMessage(ctx, sub, m)
+				}
+			}
+		}
+	}
+}
+
+// pushMessage message represents the JSON body POSTed to push endpoints.
+type pushMessage struct {
+	Message struct {
+		Data        string            `json:"data"`
+		MessageID   string            `json:"messageId"`
+		Attributes  map[string]string `json:"attributes,omitempty"`
+		PublishTime string            `json:"publishTime"`
+	} `json:"message"`
+	Subscription string `json:"subscription"`
+}
+
+func (s *Service) pushMessage(ctx context.Context, sub *subscription, m *message) {
+	body := pushMessage{Subscription: sub.Name}
+	body.Message.Data = encodeBase64(m.Data)
+	body.Message.MessageID = m.ID
+	body.Message.Attributes = m.Attributes
+	body.Message.PublishTime = m.PublishTime.Format(time.RFC3339Nano)
+
+	jsonBody, _ := json.Marshal(body)
+
+	result := s.dispatcher.Dispatch(ctx, sub.PushEndpoint, jsonBody, nil)
+	if result.Err == nil {
+		// 2xx: auto-ack.
+		s.store.Acknowledge(sub.Name, []string{m.AckID})
+	} else {
+		// Delivery failed. Check if we should dead-letter.
+		if sub.DeadLetterTopic != "" && sub.MaxDeliveryAttempts > 0 && m.DeliveryAttempt >= sub.MaxDeliveryAttempts {
+			s.store.ForwardToDeadLetter(sub.Name, m.AckID)
+			if !s.quiet {
+				s.logger.Printf("push %s: dead-lettered message %s after %d attempts", sub.Name, m.ID, m.DeliveryAttempt)
+			}
+		}
+	}
+}
+
+func encodeBase64(data []byte) string {
+	return base64.StdEncoding.EncodeToString(data)
+}
+
 
 func (s *Service) loggingInterceptor(
 	ctx context.Context,
@@ -199,7 +273,20 @@ func (s *Service) CreateSubscription(_ context.Context, req *pubsubpb.Subscripti
 		return nil, status.Errorf(codes.InvalidArgument, "topic is required")
 	}
 
-	sub, err := s.store.CreateSubscription(req.GetName(), req.GetTopic(), req.GetAckDeadlineSeconds())
+	cfg := SubscriptionConfig{
+		Name:               req.GetName(),
+		Topic:              req.GetTopic(),
+		AckDeadlineSeconds: req.GetAckDeadlineSeconds(),
+	}
+	if pc := req.GetPushConfig(); pc != nil {
+		cfg.PushEndpoint = pc.GetPushEndpoint()
+	}
+	if dlp := req.GetDeadLetterPolicy(); dlp != nil {
+		cfg.DeadLetterTopic = dlp.GetDeadLetterTopic()
+		cfg.MaxDeliveryAttempts = dlp.GetMaxDeliveryAttempts()
+	}
+
+	sub, err := s.store.CreateSubscription(cfg)
 	if err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			return nil, status.Errorf(codes.AlreadyExists, "Subscription already exists: %s", req.GetName())
@@ -210,11 +297,25 @@ func (s *Service) CreateSubscription(_ context.Context, req *pubsubpb.Subscripti
 		return nil, status.Errorf(codes.Internal, "%v", err)
 	}
 
-	return &pubsubpb.Subscription{
+	return subscriptionToProto(sub), nil
+}
+
+func subscriptionToProto(sub *subscription) *pubsubpb.Subscription {
+	pb := &pubsubpb.Subscription{
 		Name:               sub.Name,
 		Topic:              sub.Topic,
 		AckDeadlineSeconds: sub.AckDeadlineSeconds,
-	}, nil
+	}
+	if sub.PushEndpoint != "" {
+		pb.PushConfig = &pubsubpb.PushConfig{PushEndpoint: sub.PushEndpoint}
+	}
+	if sub.DeadLetterTopic != "" {
+		pb.DeadLetterPolicy = &pubsubpb.DeadLetterPolicy{
+			DeadLetterTopic:     sub.DeadLetterTopic,
+			MaxDeliveryAttempts: sub.MaxDeliveryAttempts,
+		}
+	}
+	return pb
 }
 
 func (s *Service) GetSubscription(_ context.Context, req *pubsubpb.GetSubscriptionRequest) (*pubsubpb.Subscription, error) {
@@ -227,11 +328,7 @@ func (s *Service) GetSubscription(_ context.Context, req *pubsubpb.GetSubscripti
 		return nil, status.Errorf(codes.NotFound, "Subscription not found: %s", req.GetSubscription())
 	}
 
-	return &pubsubpb.Subscription{
-		Name:               sub.Name,
-		Topic:              sub.Topic,
-		AckDeadlineSeconds: sub.AckDeadlineSeconds,
-	}, nil
+	return subscriptionToProto(sub), nil
 }
 
 func (s *Service) ListSubscriptions(_ context.Context, req *pubsubpb.ListSubscriptionsRequest) (*pubsubpb.ListSubscriptionsResponse, error) {
@@ -245,11 +342,7 @@ func (s *Service) ListSubscriptions(_ context.Context, req *pubsubpb.ListSubscri
 	subs := s.store.ListSubscriptions(projectID)
 	var pbSubs []*pubsubpb.Subscription
 	for _, sub := range subs {
-		pbSubs = append(pbSubs, &pubsubpb.Subscription{
-			Name:               sub.Name,
-			Topic:              sub.Topic,
-			AckDeadlineSeconds: sub.AckDeadlineSeconds,
-		})
+		pbSubs = append(pbSubs, subscriptionToProto(sub))
 	}
 
 	return &pubsubpb.ListSubscriptionsResponse{
@@ -375,8 +468,12 @@ func (s *Service) StreamingPull(stream pubsubpb.Subscriber_StreamingPullServer) 
 		return status.Errorf(codes.InvalidArgument, "subscription is required")
 	}
 
-	if _, ok := s.store.GetSubscription(subName); !ok {
+	sub, ok := s.store.GetSubscription(subName)
+	if !ok {
 		return status.Errorf(codes.NotFound, "Subscription not found: %s", subName)
+	}
+	if sub.PushEndpoint != "" {
+		return status.Errorf(codes.FailedPrecondition, "Subscription %s has a push endpoint configured; cannot use StreamingPull", subName)
 	}
 
 	ctx := stream.Context()

@@ -23,18 +23,32 @@ type subscription struct {
 	Name               string `json:"name"`
 	Topic              string `json:"topic"`
 	AckDeadlineSeconds int32  `json:"ackDeadlineSeconds"`
+	PushEndpoint       string `json:"pushEndpoint,omitempty"`
+	DeadLetterTopic    string `json:"deadLetterTopic,omitempty"`
+	MaxDeliveryAttempts int32 `json:"maxDeliveryAttempts,omitempty"`
+}
+
+// SubscriptionConfig holds all parameters for creating a subscription.
+type SubscriptionConfig struct {
+	Name               string
+	Topic              string
+	AckDeadlineSeconds int32
+	PushEndpoint       string
+	DeadLetterTopic    string
+	MaxDeliveryAttempts int32
 }
 
 // message is a message held in a subscription's queue.
 type message struct {
-	ID          string            `json:"id"`
-	Data        []byte            `json:"data"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
-	PublishTime time.Time         `json:"publishTime"`
-	AckDeadline time.Time         `json:"ackDeadline"`
-	AckID       string            `json:"ackId"`
-	Delivered   bool              `json:"delivered"`
-	OrderingKey string            `json:"orderingKey,omitempty"`
+	ID              string            `json:"id"`
+	Data            []byte            `json:"data"`
+	Attributes      map[string]string `json:"attributes,omitempty"`
+	PublishTime     time.Time         `json:"publishTime"`
+	AckDeadline     time.Time         `json:"ackDeadline"`
+	AckID           string            `json:"ackId"`
+	Delivered       bool              `json:"delivered"`
+	OrderingKey     string            `json:"orderingKey,omitempty"`
+	DeliveryAttempt int32             `json:"deliveryAttempt,omitempty"`
 }
 
 // Store is the in-memory backend for the Pub/Sub emulator.
@@ -134,34 +148,38 @@ func (s *Store) DeleteTopic(name string) error {
 
 // --- Subscription operations ---
 
-func (s *Store) CreateSubscription(name, topicName string, ackDeadlineSeconds int32) (*subscription, error) {
+func (s *Store) CreateSubscription(cfg SubscriptionConfig) (*subscription, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.subscriptions[name]; exists {
-		return nil, fmt.Errorf("already exists: subscription %q", name)
+	if _, exists := s.subscriptions[cfg.Name]; exists {
+		return nil, fmt.Errorf("already exists: subscription %q", cfg.Name)
 	}
 
-	if _, exists := s.topics[topicName]; !exists {
-		return nil, fmt.Errorf("not found: topic %q", topicName)
+	if _, exists := s.topics[cfg.Topic]; !exists {
+		return nil, fmt.Errorf("not found: topic %q", cfg.Topic)
 	}
 
-	if ackDeadlineSeconds <= 0 {
-		ackDeadlineSeconds = 10
+	ackDeadline := cfg.AckDeadlineSeconds
+	if ackDeadline <= 0 {
+		ackDeadline = 10
 	}
 
 	sub := &subscription{
-		Name:               name,
-		Topic:              topicName,
-		AckDeadlineSeconds: ackDeadlineSeconds,
+		Name:                cfg.Name,
+		Topic:               cfg.Topic,
+		AckDeadlineSeconds:  ackDeadline,
+		PushEndpoint:        cfg.PushEndpoint,
+		DeadLetterTopic:     cfg.DeadLetterTopic,
+		MaxDeliveryAttempts: cfg.MaxDeliveryAttempts,
 	}
-	s.subscriptions[name] = sub
-	s.messages[name] = make(map[string]*message)
+	s.subscriptions[cfg.Name] = sub
+	s.messages[cfg.Name] = make(map[string]*message)
 
-	if _, ok := s.topicSubs[topicName]; !ok {
-		s.topicSubs[topicName] = make(map[string]struct{})
+	if _, ok := s.topicSubs[cfg.Topic]; !ok {
+		s.topicSubs[cfg.Topic] = make(map[string]struct{})
 	}
-	s.topicSubs[topicName][name] = struct{}{}
+	s.topicSubs[cfg.Topic][cfg.Name] = struct{}{}
 
 	s.persist()
 	return sub, nil
@@ -362,6 +380,110 @@ func (s *Store) ModifyAckDeadline(subName string, ackIDs []string, ackDeadlineSe
 
 	s.persist()
 	return nil
+}
+
+// PushSubscriptions returns all subscriptions that have a push endpoint configured.
+func (s *Store) PushSubscriptions() []*subscription {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []*subscription
+	for _, sub := range s.subscriptions {
+		if sub.PushEndpoint != "" {
+			result = append(result, sub)
+		}
+	}
+	return result
+}
+
+// PullAllUndelivered returns all undelivered messages for a subscription and
+// marks them as delivered, incrementing DeliveryAttempt. Used by push delivery.
+func (s *Store) PullAllUndelivered(subName string) []*message {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sub, exists := s.subscriptions[subName]
+	if !exists {
+		return nil
+	}
+	msgs, ok := s.messages[subName]
+	if !ok {
+		return nil
+	}
+
+	now := time.Now()
+	var result []*message
+	var candidates []*message
+	for _, m := range msgs {
+		if !m.Delivered || now.After(m.AckDeadline) {
+			candidates = append(candidates, m)
+		}
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].ID < candidates[j].ID })
+
+	for _, m := range candidates {
+		m.Delivered = true
+		m.DeliveryAttempt++
+		m.AckDeadline = now.Add(time.Duration(sub.AckDeadlineSeconds) * time.Second)
+		result = append(result, m)
+	}
+	return result
+}
+
+// ForwardToDeadLetter moves a message from its subscription to the dead letter
+// topic by publishing it there. Returns true if forwarded.
+func (s *Store) ForwardToDeadLetter(subName, ackID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sub, exists := s.subscriptions[subName]
+	if !exists || sub.DeadLetterTopic == "" {
+		return false
+	}
+
+	msgs, ok := s.messages[subName]
+	if !ok {
+		return false
+	}
+	m, exists := msgs[ackID]
+	if !exists {
+		return false
+	}
+
+	// Publish to dead letter topic.
+	if _, topicExists := s.topics[sub.DeadLetterTopic]; !topicExists {
+		return false
+	}
+
+	id := fmt.Sprintf("%d", s.msgCounter.Add(1))
+	now := time.Now()
+
+	// Fan out to all subscriptions of the dead letter topic.
+	if dlSubs, ok := s.topicSubs[sub.DeadLetterTopic]; ok {
+		for dlSubName := range dlSubs {
+			dlSub := s.subscriptions[dlSubName]
+			if dlSub == nil {
+				continue
+			}
+			ackID := fmt.Sprintf("%s:%s", dlSubName, id)
+			dlMsg := &message{
+				ID:          id,
+				Data:        m.Data,
+				Attributes:  m.Attributes,
+				PublishTime: now,
+				AckID:       ackID,
+				OrderingKey: m.OrderingKey,
+			}
+			if s.messages[dlSubName] == nil {
+				s.messages[dlSubName] = make(map[string]*message)
+			}
+			s.messages[dlSubName][ackID] = dlMsg
+		}
+	}
+
+	// Remove from original subscription.
+	delete(msgs, m.AckID)
+	s.persist()
+	return true
 }
 
 // --- Persistence ---
