@@ -1,13 +1,13 @@
 # localgcp
 
-The first unified GCP emulator. One binary, five services, zero cloud bills.
+The first unified GCP emulator. One binary, six services, zero cloud bills.
 
 ```bash
 # Homebrew (macOS/Linux)
 brew install slokam-ai/tap/localgcp
 
 # Docker
-docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 -p 8089:8089 ghcr.io/slokam-ai/localgcp
+docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 -p 8089:8089 -p 8090:8090 ghcr.io/slokam-ai/localgcp
 
 # Pre-built binary
 # Download from https://github.com/slokam-ai/localgcp/releases
@@ -33,6 +33,7 @@ localgcp emulates core GCP services locally so you can develop and test without 
 | Secret Manager | gRPC | 8086 | (manual endpoint config) |
 | Firestore | gRPC | 8088 | `FIRESTORE_EMULATOR_HOST` |
 | Cloud Tasks | gRPC | 8089 | (manual endpoint config) |
+| Vertex AI | REST | 8090 | (manual endpoint config) |
 
 ## Quick start
 
@@ -74,6 +75,23 @@ client = secretmanager.SecretManagerServiceClient(
     client_options={"api_endpoint": "localhost:8086"},
 )
 ```
+
+**Vertex AI** uses the new `google.golang.org/genai` SDK with a custom base URL:
+
+```go
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+    Project:  "my-project",
+    Location: "us-central1",
+    Backend:  genai.BackendVertexAI,
+    HTTPOptions: genai.HTTPOptions{
+        BaseURL: "http://localhost:8090",
+    },
+})
+// Now use client.Models.GenerateContent() as normal.
+// Requests go to localgcp -> Ollama (if running) or stub responses.
+```
+
+Start Ollama separately for real local inference: `ollama serve` then `ollama pull llama3.2`.
 
 ### 3. Use your app normally
 
@@ -118,6 +136,14 @@ Your GCP client libraries work against localgcp with zero code changes (except S
 - Task scheduling (delay execution by N seconds)
 - Retry with configurable max attempts and exponential backoff
 
+### Vertex AI (Gemini API)
+- Text generation (generateContent) via local models or stub responses
+- Text embeddings (embedContent/predict) with configurable dimensions
+- Ollama backend: proxy Vertex AI calls to local LLMs (llama3, gemma, etc.)
+- Stub backend: deterministic responses when no model runner is available (CI/CD)
+- Model alias registry: map Vertex model names to local model names (e.g. `gemini-2.5-flash` -> `llama3.2`)
+- Works with the official `google.golang.org/genai` SDK via `HTTPOptions.BaseURL`
+
 ## CLI reference
 
 ```
@@ -136,6 +162,9 @@ localgcp --version         Print version
 | `--port-secretmanager` | 8086 | Secret Manager port |
 | `--port-firestore` | 8088 | Firestore port |
 | `--port-cloudtasks` | 8089 | Cloud Tasks port |
+| `--port-vertexai` | 8090 | Vertex AI port |
+| `--ollama-host` | `http://localhost:11434` | Ollama API host for Vertex AI |
+| `--vertex-model-map` | (defaults) | Model aliases (e.g. `gemini-2.5-flash=llama3.2`) |
 | `--quiet`, `-q` | false | Suppress request logging |
 
 ## How it works
@@ -150,6 +179,7 @@ GCP client libraries already support `*_EMULATOR_HOST` environment variables. Wh
 - Pub/Sub: exactly-once delivery, message ordering
 - Firestore: composite indexes, collection group queries, resume tokens for listeners
 - Cloud Tasks: App Engine task targets, OIDC/OAuth authentication
+- Vertex AI: streaming (streamGenerateContent), tool/function calling, multimodal (images/audio), multi-provider backends (OpenAI, Anthropic)
 - Secret Manager: IAM bindings, replication policies, rotation
 - IAM/auth enforcement (all requests are accepted)
 

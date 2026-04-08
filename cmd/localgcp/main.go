@@ -74,7 +74,7 @@ func upCmd() *cobra.Command {
 }
 
 func envCmd() *cobra.Command {
-	var portGCS, portPubSub, portFirestore, portSecretManager, portCloudTasks int
+	var portGCS, portPubSub, portFirestore, portSecretManager, portCloudTasks, portVertexAI int
 
 	cmd := &cobra.Command{
 		Use:   "env",
@@ -107,6 +107,13 @@ func envCmd() *cobra.Command {
 			fmt.Println("#     option.WithoutAuthentication(),")
 			fmt.Println("#     option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),")
 			fmt.Println("#   )")
+			fmt.Println("#")
+			fmt.Println("# Vertex AI (google.golang.org/genai):")
+			fmt.Println("#   client, _ := genai.NewClient(ctx, &genai.ClientConfig{")
+			fmt.Println("#     Project: \"my-project\", Location: \"us-central1\",")
+			fmt.Println("#     Backend: genai.BackendVertexAI,")
+			fmt.Printf("#     HTTPOptions: genai.HTTPOptions{BaseURL: \"http://localhost:%d\"},\n", portVertexAI)
+			fmt.Println("#   })")
 
 			return nil
 		},
@@ -118,6 +125,7 @@ func envCmd() *cobra.Command {
 	cmd.Flags().IntVar(&portFirestore, "port-firestore", cfg.PortFirestore, "Port for Firestore")
 	cmd.Flags().IntVar(&portSecretManager, "port-secretmanager", cfg.PortSecretManager, "Port for Secret Manager")
 	cmd.Flags().IntVar(&portCloudTasks, "port-cloudtasks", cfg.PortCloudTasks, "Port for Cloud Tasks")
+	cmd.Flags().IntVar(&portVertexAI, "port-vertexai", cfg.PortVertexAI, "Port for Vertex AI")
 
 	return cmd
 }
