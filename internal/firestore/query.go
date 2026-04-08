@@ -140,24 +140,78 @@ func getFieldValue(fields map[string]*firestorepb.Value, path string) *firestore
 
 // matchesOp evaluates whether docVal <op> target is true.
 func matchesOp(docVal, target *firestorepb.Value, op firestorepb.StructuredQuery_FieldFilter_Operator) bool {
-	cmp := compareValues(docVal, target)
-
 	switch op {
 	case firestorepb.StructuredQuery_FieldFilter_EQUAL:
-		return cmp == 0
+		return compareValues(docVal, target) == 0
 	case firestorepb.StructuredQuery_FieldFilter_NOT_EQUAL:
-		return cmp != 0
+		return compareValues(docVal, target) != 0
 	case firestorepb.StructuredQuery_FieldFilter_LESS_THAN:
-		return cmp < 0
+		return compareValues(docVal, target) < 0
 	case firestorepb.StructuredQuery_FieldFilter_LESS_THAN_OR_EQUAL:
-		return cmp <= 0
+		return compareValues(docVal, target) <= 0
 	case firestorepb.StructuredQuery_FieldFilter_GREATER_THAN:
-		return cmp > 0
+		return compareValues(docVal, target) > 0
 	case firestorepb.StructuredQuery_FieldFilter_GREATER_THAN_OR_EQUAL:
-		return cmp >= 0
+		return compareValues(docVal, target) >= 0
+	case firestorepb.StructuredQuery_FieldFilter_IN:
+		return valueInArray(docVal, target)
+	case firestorepb.StructuredQuery_FieldFilter_NOT_IN:
+		return !valueInArray(docVal, target)
+	case firestorepb.StructuredQuery_FieldFilter_ARRAY_CONTAINS:
+		return arrayContains(docVal, target)
+	case firestorepb.StructuredQuery_FieldFilter_ARRAY_CONTAINS_ANY:
+		return arrayContainsAny(docVal, target)
 	default:
 		return false
 	}
+}
+
+// valueInArray returns true if docVal equals any element in target's array.
+// Used for IN: where("status", "in", ["active", "pending"]).
+func valueInArray(docVal, target *firestorepb.Value) bool {
+	arr := target.GetArrayValue()
+	if arr == nil {
+		return false
+	}
+	for _, v := range arr.GetValues() {
+		if compareValues(docVal, v) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// arrayContains returns true if docVal is an array that contains target.
+// Used for ARRAY_CONTAINS: where("tags", "array-contains", "go").
+func arrayContains(docVal, target *firestorepb.Value) bool {
+	arr := docVal.GetArrayValue()
+	if arr == nil {
+		return false
+	}
+	for _, v := range arr.GetValues() {
+		if compareValues(v, target) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// arrayContainsAny returns true if docVal is an array that contains any element of target's array.
+// Used for ARRAY_CONTAINS_ANY: where("tags", "array-contains-any", ["go", "rust"]).
+func arrayContainsAny(docVal, target *firestorepb.Value) bool {
+	docArr := docVal.GetArrayValue()
+	targetArr := target.GetArrayValue()
+	if docArr == nil || targetArr == nil {
+		return false
+	}
+	for _, tv := range targetArr.GetValues() {
+		for _, dv := range docArr.GetValues() {
+			if compareValues(dv, tv) == 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // typeOrder returns the Firestore type ordering rank for a Value.
