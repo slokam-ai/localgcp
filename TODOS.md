@@ -2,11 +2,8 @@
 
 ## Phase 2
 
-### Dispatcher: limit response body size
-- **What:** Add `io.LimitedReader` (cap 1MB) to HTTP response body reads in the shared dispatcher.
-- **Why:** Prevents OOM if a push/task endpoint returns a huge error response.
-- **Context:** The dispatcher is used by both Pub/Sub push and Cloud Tasks. Without a limit, a misbehaving endpoint could cause memory spikes. 5 lines of code.
-- **Depends on:** Shared dispatcher implementation (internal/dispatch/).
+### ~~Dispatcher: limit response body size~~ (DONE)
+- Implemented in `internal/dispatch/dispatcher.go` with `io.LimitReader(resp.Body, 1<<20)`.
 
 ### README: prior art section
 - **What:** Add a "Prior Art" section to README.md acknowledging existing community emulators with links.

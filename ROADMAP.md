@@ -23,8 +23,8 @@ Fill the gaps that matter most for real-world adoption.
 - [x] Firestore `in`, `not-in`, `array-contains`, `array-contains-any` operators
 - [x] Pub/Sub push subscriptions (server POSTs to user endpoint)
 - [x] Pub/Sub dead letter topic support
-- [ ] Cloud Tasks (queue/task CRUD, HTTP dispatch, scheduling)
-- [ ] GCS signed URLs
+- [x] Cloud Tasks (queue/task CRUD, HTTP dispatch, scheduling)
+- [x] GCS signed URLs
 - [ ] ~~Eventarc~~ (deferred to Phase 3, depends on Cloud Run)
 - [ ] ~~Firestore collection group queries~~ (deferred to Phase 3, complex indexing)
 

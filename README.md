@@ -1,13 +1,13 @@
 # localgcp
 
-The first unified GCP emulator. One binary, four services, zero cloud bills.
+The first unified GCP emulator. One binary, five services, zero cloud bills.
 
 ```bash
 # Homebrew (macOS/Linux)
 brew install slokam-ai/tap/localgcp
 
 # Docker
-docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 ghcr.io/slokam-ai/localgcp
+docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 -p 8089:8089 ghcr.io/slokam-ai/localgcp
 
 # Pre-built binary
 # Download from https://github.com/slokam-ai/localgcp/releases
@@ -32,6 +32,7 @@ localgcp emulates core GCP services locally so you can develop and test without 
 | Pub/Sub | gRPC | 8085 | `PUBSUB_EMULATOR_HOST` |
 | Secret Manager | gRPC | 8086 | (manual endpoint config) |
 | Firestore | gRPC | 8088 | `FIRESTORE_EMULATOR_HOST` |
+| Cloud Tasks | gRPC | 8089 | (manual endpoint config) |
 
 ## Quick start
 
@@ -85,11 +86,14 @@ Your GCP client libraries work against localgcp with zero code changes (except S
 - Object upload (simple, multipart, resumable)
 - Object download, metadata, delete, copy
 - Object listing with prefix and delimiter (directory-like browsing)
+- Signed URL generation and download
 - Works with both JSON API and XML API paths
 
 ### Pub/Sub
 - Topic and subscription management
 - Publish and pull (including StreamingPull for official client libraries)
+- Push subscriptions (HTTP POST to your endpoint, auto-ack on 2xx)
+- Dead letter topic support (forward after N failed deliveries)
 - Message acknowledgment and deadline modification
 - Fan-out: multiple subscriptions each get all messages
 
@@ -100,11 +104,19 @@ Your GCP client libraries work against localgcp with zero code changes (except S
 
 ### Firestore
 - Document CRUD with auto-generated IDs
-- Structured queries: equality filters, range queries (>, <, >=, <=, !=)
+- Real-time listeners (`onSnapshot` / Listen streaming RPC)
+- Structured queries: equality, range, `in`, `not-in`, `array-contains`, `array-contains-any`
 - OrderBy, limit, offset
 - Transactions (begin, commit, rollback)
 - Nested collections and subcollections
 - BatchGetDocuments for official client library compatibility
+
+### Cloud Tasks
+- Queue CRUD (create, get, list, delete, purge)
+- Task CRUD (create, get, list, delete)
+- HTTP target dispatch to user-configured URLs
+- Task scheduling (delay execution by N seconds)
+- Retry with configurable max attempts and exponential backoff
 
 ## CLI reference
 
@@ -123,6 +135,7 @@ localgcp --version         Print version
 | `--port-pubsub` | 8085 | Pub/Sub port |
 | `--port-secretmanager` | 8086 | Secret Manager port |
 | `--port-firestore` | 8088 | Firestore port |
+| `--port-cloudtasks` | 8089 | Cloud Tasks port |
 | `--quiet`, `-q` | false | Suppress request logging |
 
 ## How it works
@@ -133,9 +146,10 @@ GCP client libraries already support `*_EMULATOR_HOST` environment variables. Wh
 
 ## What's NOT included (yet)
 
-- Cloud Storage: signed URLs, bucket versioning, object compose, IAM policies
-- Pub/Sub: push subscriptions, exactly-once delivery, dead letter queues, message ordering
-- Firestore: real-time listeners (`onSnapshot`), composite indexes, collection group queries, `in`/`array-contains` operators
+- Cloud Storage: bucket versioning, object compose, IAM policies
+- Pub/Sub: exactly-once delivery, message ordering
+- Firestore: composite indexes, collection group queries, resume tokens for listeners
+- Cloud Tasks: App Engine task targets, OIDC/OAuth authentication
 - Secret Manager: IAM bindings, replication policies, rotation
 - IAM/auth enforcement (all requests are accepted)
 
