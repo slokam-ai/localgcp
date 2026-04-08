@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>localgcp - The unified GCP emulator</title>
+  <meta name="description" content="One binary, four services, zero cloud bills. Emulate Cloud Storage, Pub/Sub, Secret Manager, and Firestore locally.">
+  <meta property="og:title" content="localgcp - The unified GCP emulator">
+  <meta property="og:description" content="One binary, four services, zero cloud bills. Develop against GCP locally.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://localgcp.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================
+       localgcp — Saffron & Ink (inherited from Slokam)
+       ============================================ */
+
+    :root,
+    [data-theme="dark"] {
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #141414;
+      --bg-card: #1a1a1a;
+      --bg-card-hover: #222222;
+      --border: #222222;
+      --border-light: #333333;
+      --text-primary: #e8e8e8;
+      --text-secondary: #999999;
+      --text-muted: #666666;
+      --text-dim: #444444;
+      --saffron: #C4841D;
+      --saffron-dim: #5a3a0a;
+      --saffron-glow: rgba(196, 132, 29, 0.15);
+      --saffron-hover: #d4941d;
+      --code-bg: #1a1a1a;
+      --code-border: #2a2a2a;
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f8f6f2;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f0ede8;
+      --border: #e0dbd3;
+      --border-light: #d4cfc7;
+      --text-primary: #1a1a1a;
+      --text-secondary: #555555;
+      --text-muted: #888888;
+      --text-dim: #aaaaaa;
+      --saffron: #8B5E1A;
+      --saffron-dim: #E8D5B0;
+      --saffron-glow: rgba(139, 94, 26, 0.1);
+      --saffron-hover: #a06f20;
+      --code-bg: #f0ede8;
+      --code-border: #d4cfc7;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html {
+      font-size: 16px;
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: 'Space Grotesk', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.7;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    a { color: var(--saffron); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--saffron-hover); }
+
+    h1, h2, h3 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 400;
+      line-height: 1.3;
+    }
+
+    h1 { font-size: 3rem; }
+    h2 { font-size: 2rem; margin-bottom: 1rem; }
+    h3 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+
+    p { margin-bottom: 1.25rem; color: var(--text-secondary); }
+
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+
+    /* --- Nav --- */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border);
+      transition: background 0.3s ease;
+    }
+
+    .nav-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.1rem;
+      font-weight: 500;
+      letter-spacing: 2px;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    .logo span { color: var(--saffron); }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .nav-link {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+    }
+
+    .nav-link:hover { color: var(--text-primary); }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .theme-toggle:hover { color: var(--text-primary); border-color: var(--border-light); }
+
+    [data-theme="dark"] .icon-sun { display: block; }
+    [data-theme="dark"] .icon-moon { display: none; }
+    [data-theme="light"] .icon-sun { display: none; }
+    [data-theme="light"] .icon-moon { display: block; }
+
+    /* --- Container --- */
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    main { padding-top: 64px; }
+
+    section { padding: 5rem 0; }
+
+    .section-label {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--saffron);
+      margin-bottom: 0.5rem;
+    }
+
+    /* --- Divider --- */
+    .divider {
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+      font-size: 1.2rem;
+      letter-spacing: 0.4em;
+      padding: 1rem 0;
+    }
+
+    /* --- Hero --- */
+    .hero {
+      text-align: center;
+      padding: 6rem 0 4rem;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.25rem, 5vw, 3.5rem);
+      margin-bottom: 0.5rem;
+    }
+
+    .hero-tagline {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      color: var(--saffron);
+      letter-spacing: 2px;
+      margin-bottom: 2rem;
+    }
+
+    .hero-desc {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 3rem;
+      line-height: 1.8;
+    }
+
+    .hero-terminal {
+      display: inline-block;
+      text-align: left;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border-light);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      max-width: 580px;
+      width: 100%;
+    }
+
+    .terminal-bar {
+      background: #2a2a2a;
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    [data-theme="light"] .terminal-bar { background: #d4cfc7; }
+
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .terminal-dot.red { background: #ff5f57; }
+    .terminal-dot.yellow { background: #febc2e; }
+    .terminal-dot.green { background: #28c840; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .terminal-body {
+      background: #0e0e0e;
+      padding: 1.25rem 1.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1.9;
+      color: #cccccc;
+      white-space: pre;
+    }
+
+    [data-theme="light"] .terminal-body {
+      background: #1a1a1a;
+      color: #cccccc;
+    }
+
+    .terminal-body .prompt { color: var(--saffron); font-weight: 500; }
+    .terminal-body .cmd { color: #e8e8e8; }
+    .terminal-body .dim { color: #555555; }
+    .terminal-body .svc { color: #888888; }
+    .terminal-body .port { color: var(--saffron); }
+    .terminal-body .ready { color: #28c840; }
+
+    /* --- Services --- */
+    .services {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .service {
+      background: var(--bg-card);
+      padding: 2rem;
+      transition: background 0.2s;
+    }
+
+    .service:hover { background: var(--bg-card-hover); }
+
+    .service-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 1.05rem;
+      margin-bottom: 0.25rem;
+      color: var(--text-primary);
+    }
+
+    .service-proto {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--saffron);
+      margin-bottom: 0.75rem;
+    }
+
+    .service-desc {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 0;
+    }
+
+    /* --- Steps --- */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 3rem 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--saffron);
+      padding-top: 0.15rem;
+    }
+
+    .step h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .step p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.75rem;
+    }
+
+    .step code {
+      display: block;
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+
+    .step code .prompt { color: var(--saffron); }
+
+    /* --- Comparison --- */
+    .comparison {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem;
+    }
+
+    .comp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      margin-top: 1.5rem;
+    }
+
+    .comp-col h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 1rem;
+      color: var(--text-muted);
+    }
+
+    .comp-col ul { list-style: none; font-size: 0.9rem; }
+
+    .comp-col ul li {
+      padding: 0.4rem 0;
+      color: var(--text-muted);
+    }
+
+    .comp-col ul li::before { margin-right: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+    .comp-before li::before { content: "~"; }
+    .comp-after li::before { content: ">"; color: var(--saffron); }
+    .comp-after li { color: var(--text-primary); }
+
+    /* --- Quote --- */
+    .quote {
+      border-left: 3px solid var(--saffron);
+      padding-left: 1.5rem;
+      margin: 2rem 0;
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    /* --- CTA --- */
+    .cta {
+      text-align: center;
+      padding: 5rem 0;
+    }
+
+    .cta p { color: var(--text-secondary); margin-bottom: 2rem; }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--saffron);
+      color: #fff;
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .cta-btn:hover { background: var(--saffron-hover); color: #fff; transform: translateY(-1px); }
+
+    .cta-install {
+      display: block;
+      margin-top: 1.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .cta-install a { color: var(--saffron); }
+
+    /* --- Footer --- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0;
+      text-align: center;
+    }
+
+    footer p {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--saffron); }
+
+    /* --- Responsive --- */
+    @media (max-width: 768px) {
+      .services { grid-template-columns: 1fr; }
+      .comp-grid { grid-template-columns: 1fr; gap: 2rem; }
+      .hero { padding: 4rem 0 3rem; }
+      .hero-code { font-size: 0.8rem; padding: 1rem 1.25rem; }
+      section { padding: 3.5rem 0; }
+      .comparison { padding: 1.5rem; }
+      .nav-right { gap: 1rem; }
+      .nav-link { font-size: 0.8rem; }
+    }
+
+    @media (max-width: 480px) {
+      h1 { font-size: 1.75rem; }
+      h2 { font-size: 1.25rem; }
+      .container { padding: 0 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-inner">
+      <a href="/" class="logo"><span>&gt;</span> localgcp</a>
+      <div class="nav-right">
+        <a href="https://github.com/slokam-ai/localgcp" class="nav-link">GitHub</a>
+        <a href="https://github.com/slokam-ai/localgcp/blob/main/README.md" class="nav-link">Docs</a>
+        <a href="https://github.com/slokam-ai/localgcp/blob/main/ROADMAP.md" class="nav-link">Roadmap</a>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="container">
+
+      <section class="hero">
+        <h1>localgcp</h1>
+        <div class="hero-tagline">{ the unified GCP emulator }</div>
+        <p class="hero-desc">
+          One binary, four services, zero cloud bills.
+          Develop against Cloud Storage, Pub/Sub, Secret Manager, and Firestore
+          without leaving localhost.
+        </p>
+        <div class="hero-terminal">
+          <div class="terminal-bar">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">localgcp</span>
+          </div>
+          <div class="terminal-body"><span class="prompt">$</span> <span class="cmd">go install github.com/slokam-ai/localgcp@latest</span>
+<span class="prompt">$</span> <span class="cmd">localgcp up</span>
+<span class="dim">Starting localgcp...</span>
+
+  <span class="svc">Cloud Storage</span>        <span class="port">:4443</span>
+  <span class="svc">Pub/Sub</span>              <span class="port">:8085</span>
+  <span class="svc">Secret Manager</span>       <span class="port">:8086</span>
+  <span class="svc">Firestore</span>            <span class="port">:8088</span>
+
+<span class="ready">localgcp is ready.</span> <span class="dim">Press Ctrl+C to stop.</span></div>
+        </div>
+      </section>
+
+      <div class="divider">{ }</div>
+
+      <section>
+        <div class="section-label">What you get</div>
+        <h2>Four services. One process.</h2>
+        <p>
+          Your GCP client libraries already support emulator host env vars.
+          Point them at localhost and your existing code works with zero changes.
+        </p>
+
+        <div class="services">
+          <div class="service">
+            <div class="service-name">Cloud Storage</div>
+            <div class="service-proto">REST &middot; :4443</div>
+            <p class="service-desc">
+              Bucket and object CRUD. Simple, multipart, and resumable uploads.
+              Prefix + delimiter listing. JSON and XML API paths.
+            </p>
+          </div>
+          <div class="service">
+            <div class="service-name">Pub/Sub</div>
+            <div class="service-proto">gRPC &middot; :8085</div>
+            <p class="service-desc">
+              Topics, subscriptions, publish, pull, and StreamingPull.
+              Fan-out delivery. Ack deadlines and redelivery.
+            </p>
+          </div>
+          <div class="service">
+            <div class="service-name">Secret Manager</div>
+            <div class="service-proto">gRPC &middot; :8086</div>
+            <p class="service-desc">
+              Secrets with versioning. Enable, disable, destroy states.
+              Access by version number or "latest" alias.
+            </p>
+          </div>
+          <div class="service">
+            <div class="service-name">Firestore</div>
+            <div class="service-proto">gRPC &middot; :8088</div>
+            <p class="service-desc">
+              Document CRUD, structured queries with equality and range filters.
+              OrderBy, limit, offset. Transactions with commit and rollback.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="divider">&gt;</div>
+
+      <section>
+        <div class="section-label">Get started</div>
+        <h2>Three commands to local GCP</h2>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">01</div>
+            <div>
+              <h3>Install</h3>
+              <p>Single binary. No Docker, no JVM, no runtime dependencies.</p>
+              <code><span class="prompt">$</span> go install github.com/slokam-ai/localgcp@latest</code>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">02</div>
+            <div>
+              <h3>Start</h3>
+              <p>All four services in the foreground. In-memory by default, or persistent with --data-dir.</p>
+              <code><span class="prompt">$</span> localgcp up</code>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">03</div>
+            <div>
+              <h3>Connect</h3>
+              <p>Sets emulator host env vars. Your GCP client libraries do the rest.</p>
+              <code><span class="prompt">$</span> eval $(localgcp env)
+<span class="prompt">$</span> go run ./your-app</code>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="divider">#</div>
+
+      <section>
+        <div class="comparison">
+          <div class="section-label">Why this exists</div>
+          <h2>Before and after</h2>
+
+          <div class="comp-grid">
+            <div class="comp-col">
+              <h3>Without localgcp</h3>
+              <ul class="comp-before">
+                <li>Spin up real GCP dev projects</li>
+                <li>Pay cloud bills for test environments</li>
+                <li>Manage individual emulators per service</li>
+                <li>Different setup for each service</li>
+                <li>No Cloud Storage emulator from Google</li>
+                <li>Requires internet connection</li>
+                <li>Shared environments, stepping on each other</li>
+              </ul>
+            </div>
+            <div class="comp-col">
+              <h3>With localgcp</h3>
+              <ul class="comp-after">
+                <li>One binary, starts in milliseconds</li>
+                <li>Zero cloud bills for dev and CI</li>
+                <li>All services in one process</li>
+                <li>Unified CLI, consistent behavior</li>
+                <li>Cloud Storage included</li>
+                <li>Works fully offline</li>
+                <li>Each developer gets their own instance</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="divider">{ }</div>
+
+      <section>
+        <div class="quote">
+          AWS has LocalStack. GCP has had nothing equivalent.
+          Fragmented emulators, inconsistent APIs, missing services.
+          Until now.
+        </div>
+      </section>
+
+      <section class="cta">
+        <h2>Start building locally</h2>
+        <p>20MB binary. 79 tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
+        <a href="https://github.com/slokam-ai/localgcp" class="cta-btn">View on GitHub</a>
+        <span class="cta-install">
+          or: <a href="https://github.com/slokam-ai/localgcp#quick-start">go install github.com/slokam-ai/localgcp@latest</a>
+        </span>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>localgcp is open source under the MIT license. Built by <a href="https://slokam.ai">Slokam AI</a>.</p>
+    </div>
+  </footer>
+
+  <script>
+    const toggle = document.getElementById('theme-toggle');
+    const html = document.documentElement;
+    const stored = localStorage.getItem('theme');
+    if (stored) {
+      html.setAttribute('data-theme', stored);
+    }
+    toggle.addEventListener('click', () => {
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+  </script>
+
+</body>
+</html>
