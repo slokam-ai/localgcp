@@ -1,0 +1,6 @@
+localgcp
+smoketest
+dist/
+.localgcp/
+*.exe
+.claude/
