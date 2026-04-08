@@ -19,8 +19,11 @@ type Config struct {
 	PortSecretManager int
 	PortFirestore     int
 	PortCloudTasks    int
+	PortVertexAI      int
 	DataDir           string
 	Quiet             bool
+	OllamaHost        string
+	VertexModelMap    string
 }
 
 // DefaultConfig returns the default server configuration.
@@ -31,6 +34,8 @@ func DefaultConfig() Config {
 		PortSecretManager: 8086,
 		PortFirestore:     8088,
 		PortCloudTasks:    8089,
+		PortVertexAI:      8090,
+		OllamaHost:        "http://localhost:11434",
 	}
 }
 
@@ -161,6 +166,8 @@ func portFlagName(serviceName string) string {
 		return "--port-firestore"
 	case "Cloud Tasks":
 		return "--port-cloudtasks"
+	case "Vertex AI":
+		return "--port-vertexai"
 	default:
 		return "--port-*"
 	}
