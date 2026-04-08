@@ -4,19 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>localgcp - The unified GCP emulator</title>
-  <meta name="description" content="One binary, four services, zero cloud bills. Emulate Cloud Storage, Pub/Sub, Secret Manager, and Firestore locally.">
-  <meta property="og:title" content="localgcp - The unified GCP emulator">
-  <meta property="og:description" content="One binary, four services, zero cloud bills. Develop against GCP locally.">
+  <meta name="description" content="One binary, six services, zero cloud bills. Run Vertex AI against local models via Ollama. Emulate Cloud Storage, Pub/Sub, Firestore, and more.">
+  <meta property="og:title" content="localgcp - Run GCP locally. Even Vertex AI.">
+  <meta property="og:description" content="One binary, six services, zero cloud bills. Proxy Vertex AI to local LLMs via Ollama.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://localgcp.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    /* ============================================
-       localgcp — Saffron & Ink (inherited from Slokam)
-       ============================================ */
-
     :root,
     [data-theme="dark"] {
       --bg-primary: #0a0a0a;
@@ -35,6 +31,8 @@
       --saffron-hover: #d4941d;
       --code-bg: #1a1a1a;
       --code-border: #2a2a2a;
+      --accent-green: #28c840;
+      --accent-blue: #4a9eff;
     }
 
     [data-theme="light"] {
@@ -54,16 +52,12 @@
       --saffron-hover: #a06f20;
       --code-bg: #f0ede8;
       --code-border: #d4cfc7;
+      --accent-green: #1a8a2e;
+      --accent-blue: #2563eb;
     }
 
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html {
-      font-size: 16px;
-      scroll-behavior: smooth;
-      -webkit-font-smoothing: antialiased;
-    }
-
+    html { font-size: 16px; scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
     body {
       font-family: 'Space Grotesk', -apple-system, sans-serif;
       background: var(--bg-primary);
@@ -71,405 +65,209 @@
       line-height: 1.7;
       transition: background 0.3s ease, color 0.3s ease;
     }
-
     a { color: var(--saffron); text-decoration: none; transition: color 0.2s; }
     a:hover { color: var(--saffron-hover); }
-
-    h1, h2, h3 {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-weight: 400;
-      line-height: 1.3;
-    }
-
+    h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; font-weight: 400; line-height: 1.3; }
     h1 { font-size: 3rem; }
     h2 { font-size: 2rem; margin-bottom: 1rem; }
     h3 { font-size: 1.5rem; margin-bottom: 0.75rem; }
-
     p { margin-bottom: 1.25rem; color: var(--text-secondary); }
-
     code, pre { font-family: 'JetBrains Mono', monospace; }
 
-    /* --- Nav --- */
     nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       background: var(--bg-primary);
       border-bottom: 1px solid var(--border);
       transition: background 0.3s ease;
     }
-
     .nav-inner {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 0 2rem;
-      height: 64px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      max-width: 1080px; margin: 0 auto; padding: 0 2rem;
+      height: 64px; display: flex; align-items: center; justify-content: space-between;
     }
-
     .logo {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1.1rem;
-      font-weight: 500;
-      letter-spacing: 2px;
-      color: var(--text-primary);
-      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace; font-size: 1.1rem;
+      font-weight: 500; letter-spacing: 2px; color: var(--text-primary); text-decoration: none;
     }
-
     .logo span { color: var(--saffron); }
-
-    .nav-right {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-    }
-
-    .nav-link {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      letter-spacing: 0.5px;
-    }
-
+    .nav-right { display: flex; align-items: center; gap: 1.5rem; }
+    .nav-link { font-size: 0.875rem; color: var(--text-secondary); letter-spacing: 0.5px; }
     .nav-link:hover { color: var(--text-primary); }
-
     .theme-toggle {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px;
-      cursor: pointer;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      transition: color 0.2s, border-color 0.2s;
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      padding: 6px; cursor: pointer; color: var(--text-muted);
+      display: flex; align-items: center; transition: color 0.2s, border-color 0.2s;
     }
-
     .theme-toggle:hover { color: var(--text-primary); border-color: var(--border-light); }
-
     [data-theme="dark"] .icon-sun { display: block; }
     [data-theme="dark"] .icon-moon { display: none; }
     [data-theme="light"] .icon-sun { display: none; }
     [data-theme="light"] .icon-moon { display: block; }
 
-    /* --- Container --- */
-    .container {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 0 2rem;
-    }
-
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 2rem; }
     main { padding-top: 64px; }
-
     section { padding: 5rem 0; }
-
     .section-label {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 0.7rem;
-      font-weight: 500;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--saffron);
-      margin-bottom: 0.5rem;
+      font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; font-weight: 500;
+      letter-spacing: 3px; text-transform: uppercase; color: var(--saffron); margin-bottom: 0.5rem;
     }
-
-    /* --- Divider --- */
     .divider {
-      text-align: center;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--text-dim);
-      font-size: 1.2rem;
-      letter-spacing: 0.4em;
-      padding: 1rem 0;
+      text-align: center; font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim); font-size: 1.2rem; letter-spacing: 0.4em; padding: 1rem 0;
     }
 
-    /* --- Hero --- */
-    .hero {
-      text-align: center;
-      padding: 6rem 0 4rem;
-    }
-
-    .hero h1 {
-      font-size: clamp(2.25rem, 5vw, 3.5rem);
-      margin-bottom: 0.5rem;
-    }
-
+    /* Hero */
+    .hero { text-align: center; padding: 6rem 0 4rem; }
+    .hero h1 { font-size: clamp(2.25rem, 5vw, 3.5rem); margin-bottom: 0.5rem; }
     .hero-tagline {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1rem;
-      color: var(--saffron);
-      letter-spacing: 2px;
-      margin-bottom: 2rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 1rem;
+      color: var(--saffron); letter-spacing: 2px; margin-bottom: 1.5rem;
     }
-
     .hero-desc {
-      font-size: 1.15rem;
-      color: var(--text-secondary);
-      max-width: 600px;
-      margin: 0 auto 3rem;
-      line-height: 1.8;
+      font-size: 1.15rem; color: var(--text-secondary);
+      max-width: 640px; margin: 0 auto 1.5rem; line-height: 1.8;
     }
+    .hero-highlight {
+      background: var(--saffron-glow); border: 1px solid var(--saffron-dim);
+      border-radius: 10px; padding: 1.25rem 1.75rem; max-width: 640px; margin: 0 auto 3rem;
+      font-size: 0.95rem; color: var(--text-primary); line-height: 1.7;
+    }
+    .hero-highlight strong { color: var(--saffron); }
 
     .hero-terminal {
-      display: inline-block;
-      text-align: left;
-      border-radius: 10px;
-      overflow: hidden;
-      border: 1px solid var(--border-light);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      max-width: 580px;
-      width: 100%;
+      display: inline-block; text-align: left; border-radius: 10px;
+      overflow: hidden; border: 1px solid var(--border-light);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-width: 640px; width: 100%;
     }
-
     .terminal-bar {
-      background: #2a2a2a;
-      padding: 0.6rem 1rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      background: #2a2a2a; padding: 0.6rem 1rem;
+      display: flex; align-items: center; gap: 6px;
     }
-
     [data-theme="light"] .terminal-bar { background: #d4cfc7; }
-
-    .terminal-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-
+    .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
     .terminal-dot.red { background: #ff5f57; }
     .terminal-dot.yellow { background: #febc2e; }
     .terminal-dot.green { background: #28c840; }
-
     .terminal-title {
-      flex: 1;
-      text-align: center;
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
+      flex: 1; text-align: center; font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.5px;
     }
-
     .terminal-body {
-      background: #0e0e0e;
-      padding: 1.25rem 1.5rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      line-height: 1.9;
-      color: #cccccc;
-      white-space: pre;
+      background: #0e0e0e; padding: 1.25rem 1.5rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+      line-height: 1.9; color: #cccccc; white-space: pre; overflow-x: auto;
     }
-
-    [data-theme="light"] .terminal-body {
-      background: #1a1a1a;
-      color: #cccccc;
-    }
-
+    [data-theme="light"] .terminal-body { background: #1a1a1a; color: #cccccc; }
     .terminal-body .prompt { color: var(--saffron); font-weight: 500; }
     .terminal-body .cmd { color: #e8e8e8; }
     .terminal-body .dim { color: #555555; }
     .terminal-body .svc { color: #888888; }
     .terminal-body .port { color: var(--saffron); }
     .terminal-body .ready { color: #28c840; }
+    .terminal-body .ai { color: #4a9eff; }
 
-    /* --- Services --- */
+    /* Services grid */
     .services {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px; background: var(--border);
+      border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
     }
-
     .service {
-      background: var(--bg-card);
-      padding: 2rem;
-      transition: background 0.2s;
+      background: var(--bg-card); padding: 1.75rem;
+      transition: background 0.2s; position: relative;
     }
-
     .service:hover { background: var(--bg-card-hover); }
-
     .service-name {
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 600;
-      font-size: 1.05rem;
-      margin-bottom: 0.25rem;
-      color: var(--text-primary);
+      font-family: 'Space Grotesk', sans-serif; font-weight: 600;
+      font-size: 1rem; margin-bottom: 0.2rem; color: var(--text-primary);
     }
-
     .service-proto {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--saffron);
-      margin-bottom: 0.75rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+      color: var(--saffron); margin-bottom: 0.6rem;
     }
-
     .service-desc {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      line-height: 1.6;
-      margin-bottom: 0;
+      font-size: 0.825rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 0;
     }
-
-    /* --- Steps --- */
-    .steps {
-      display: flex;
-      flex-direction: column;
-      gap: 2.5rem;
+    .service-badge {
+      position: absolute; top: 0.75rem; right: 0.75rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+      padding: 2px 8px; border-radius: 4px; letter-spacing: 1px;
     }
+    .badge-new { background: var(--saffron-glow); color: var(--saffron); border: 1px solid var(--saffron-dim); }
+    .badge-ai { background: rgba(74, 158, 255, 0.1); color: var(--accent-blue); border: 1px solid rgba(74, 158, 255, 0.2); }
 
-    .step {
-      display: grid;
-      grid-template-columns: 3rem 1fr;
-      gap: 1rem;
-      align-items: start;
-    }
-
+    /* Steps */
+    .steps { display: flex; flex-direction: column; gap: 2.5rem; }
+    .step { display: grid; grid-template-columns: 3rem 1fr; gap: 1rem; align-items: start; }
     .step-num {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      color: var(--saffron);
-      padding-top: 0.15rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+      color: var(--saffron); padding-top: 0.15rem;
     }
-
     .step h3 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
+      font-family: 'Space Grotesk', sans-serif; font-size: 1.1rem;
+      font-weight: 600; margin-bottom: 0.5rem;
     }
-
-    .step p {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      margin-bottom: 0.75rem;
-    }
-
+    .step p { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem; }
     .step code {
-      display: block;
-      background: var(--code-bg);
-      border: 1px solid var(--code-border);
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      line-height: 1.7;
+      display: block; background: var(--code-bg); border: 1px solid var(--code-border);
+      padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.8rem; line-height: 1.7;
+      white-space: pre; overflow-x: auto;
     }
-
     .step code .prompt { color: var(--saffron); }
+    .step code .comment { color: var(--text-dim); }
 
-    /* --- Comparison --- */
+    /* Comparison */
     .comparison {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 2.5rem;
+      background: var(--bg-secondary); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2.5rem;
     }
-
-    .comp-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 3rem;
-      margin-top: 1.5rem;
-    }
-
+    .comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-top: 1.5rem; }
     .comp-col h3 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 0.7rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 3px;
-      margin-bottom: 1rem;
-      color: var(--text-muted);
+      font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 3px; margin-bottom: 1rem; color: var(--text-muted);
     }
-
     .comp-col ul { list-style: none; font-size: 0.9rem; }
-
-    .comp-col ul li {
-      padding: 0.4rem 0;
-      color: var(--text-muted);
-    }
-
+    .comp-col ul li { padding: 0.4rem 0; color: var(--text-muted); }
     .comp-col ul li::before { margin-right: 0.75rem; font-family: 'JetBrains Mono', monospace; }
     .comp-before li::before { content: "~"; }
     .comp-after li::before { content: ">"; color: var(--saffron); }
     .comp-after li { color: var(--text-primary); }
 
-    /* --- Quote --- */
+    /* Quote */
     .quote {
-      border-left: 3px solid var(--saffron);
-      padding-left: 1.5rem;
-      margin: 2rem 0;
-      font-family: 'Playfair Display', serif;
-      font-style: italic;
-      font-size: 1.1rem;
-      color: var(--text-secondary);
-      line-height: 1.7;
+      border-left: 3px solid var(--saffron); padding-left: 1.5rem; margin: 2rem 0;
+      font-family: 'Playfair Display', serif; font-style: italic;
+      font-size: 1.1rem; color: var(--text-secondary); line-height: 1.7;
     }
 
-    /* --- CTA --- */
-    .cta {
-      text-align: center;
-      padding: 5rem 0;
-    }
-
+    /* CTA */
+    .cta { text-align: center; padding: 5rem 0; }
     .cta p { color: var(--text-secondary); margin-bottom: 2rem; }
-
     .cta-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: var(--saffron);
-      color: #fff;
-      padding: 0.75rem 2rem;
-      border-radius: 8px;
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 500;
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
-      transition: background 0.2s, transform 0.2s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--saffron); color: #fff; padding: 0.75rem 2rem; border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif; font-weight: 500;
+      font-size: 0.9rem; letter-spacing: 0.5px; transition: background 0.2s, transform 0.2s;
     }
-
     .cta-btn:hover { background: var(--saffron-hover); color: #fff; transform: translateY(-1px); }
-
     .cta-install {
-      display: block;
-      margin-top: 1.25rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      color: var(--text-muted);
+      display: block; margin-top: 1.25rem; font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem; color: var(--text-muted);
     }
-
     .cta-install a { color: var(--saffron); }
 
-    /* --- Footer --- */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 2.5rem 0;
-      text-align: center;
-    }
-
-    footer p {
-      font-size: 0.8rem;
-      color: var(--text-dim);
-    }
-
+    footer { border-top: 1px solid var(--border); padding: 2.5rem 0; text-align: center; }
+    footer p { font-size: 0.8rem; color: var(--text-dim); }
     footer a { color: var(--saffron); }
 
-    /* --- Responsive --- */
     @media (max-width: 768px) {
       .services { grid-template-columns: 1fr; }
       .comp-grid { grid-template-columns: 1fr; gap: 2rem; }
       .hero { padding: 4rem 0 3rem; }
-      .hero-code { font-size: 0.8rem; padding: 1rem 1.25rem; }
       section { padding: 3.5rem 0; }
       .comparison { padding: 1.5rem; }
       .nav-right { gap: 1rem; }
       .nav-link { font-size: 0.8rem; }
     }
-
     @media (max-width: 480px) {
       h1 { font-size: 1.75rem; }
       h2 { font-size: 1.25rem; }
@@ -483,8 +281,8 @@
     <div class="nav-inner">
       <a href="/" class="logo"><span>&gt;</span> localgcp</a>
       <div class="nav-right">
+        <a href="/docs/" class="nav-link">Docs</a>
         <a href="https://github.com/slokam-ai/localgcp" class="nav-link">GitHub</a>
-        <a href="https://github.com/slokam-ai/localgcp/blob/main/README.md" class="nav-link">Docs</a>
         <a href="https://github.com/slokam-ai/localgcp/blob/main/ROADMAP.md" class="nav-link">Roadmap</a>
         <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
           <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -505,10 +303,13 @@
         <h1>localgcp</h1>
         <div class="hero-tagline">{ the unified GCP emulator }</div>
         <p class="hero-desc">
-          One binary, four services, zero cloud bills.
-          Develop against Cloud Storage, Pub/Sub, Secret Manager, and Firestore
-          without leaving localhost.
+          One binary, six services, zero cloud bills.
+          Develop against GCP locally, including Vertex AI with real local inference.
         </p>
+        <div class="hero-highlight">
+          <strong>New: Vertex AI emulator.</strong> Your <code>google.golang.org/genai</code> code
+          talks to Gemma, Llama, or any Ollama model. Same SDK, zero code changes, no API keys.
+        </div>
         <div class="hero-terminal">
           <div class="terminal-bar">
             <span class="terminal-dot red"></span>
@@ -516,7 +317,7 @@
             <span class="terminal-dot green"></span>
             <span class="terminal-title">localgcp</span>
           </div>
-          <div class="terminal-body"><span class="prompt">$</span> <span class="cmd">go install github.com/slokam-ai/localgcp@latest</span>
+          <div class="terminal-body"><span class="prompt">$</span> <span class="cmd">brew install slokam-ai/tap/localgcp</span>
 <span class="prompt">$</span> <span class="cmd">localgcp up</span>
 <span class="dim">Starting localgcp...</span>
 
@@ -524,6 +325,8 @@
   <span class="svc">Pub/Sub</span>              <span class="port">:8085</span>
   <span class="svc">Secret Manager</span>       <span class="port">:8086</span>
   <span class="svc">Firestore</span>            <span class="port">:8088</span>
+  <span class="svc">Cloud Tasks</span>          <span class="port">:8089</span>
+  <span class="ai">Vertex AI</span>            <span class="port">:8090</span>  <span class="dim">ollama: gemma3</span>
 
 <span class="ready">localgcp is ready.</span> <span class="dim">Press Ctrl+C to stop.</span></div>
         </div>
@@ -533,7 +336,7 @@
 
       <section>
         <div class="section-label">What you get</div>
-        <h2>Four services. One process.</h2>
+        <h2>Six services. One process.</h2>
         <p>
           Your GCP client libraries already support emulator host env vars.
           Point them at localhost and your existing code works with zero changes.
@@ -541,19 +344,37 @@
 
         <div class="services">
           <div class="service">
+            <span class="service-badge badge-ai">AI</span>
+            <div class="service-name">Vertex AI</div>
+            <div class="service-proto">REST &middot; :8090</div>
+            <p class="service-desc">
+              generateContent and embeddings via Ollama.
+              Proxy to Gemma, Llama, or any local model.
+              Stub mode for CI/CD.
+            </p>
+          </div>
+          <div class="service">
             <div class="service-name">Cloud Storage</div>
             <div class="service-proto">REST &middot; :4443</div>
             <p class="service-desc">
               Bucket and object CRUD. Simple, multipart, and resumable uploads.
-              Prefix + delimiter listing. JSON and XML API paths.
+              Signed URLs. JSON and XML API paths.
             </p>
           </div>
           <div class="service">
             <div class="service-name">Pub/Sub</div>
             <div class="service-proto">gRPC &middot; :8085</div>
             <p class="service-desc">
-              Topics, subscriptions, publish, pull, and StreamingPull.
-              Fan-out delivery. Ack deadlines and redelivery.
+              Topics, subscriptions, publish, pull, StreamingPull.
+              Push subscriptions and dead letter topics.
+            </p>
+          </div>
+          <div class="service">
+            <div class="service-name">Firestore</div>
+            <div class="service-proto">gRPC &middot; :8088</div>
+            <p class="service-desc">
+              Document CRUD, real-time listeners (onSnapshot),
+              queries with in/array-contains. Transactions.
             </p>
           </div>
           <div class="service">
@@ -565,11 +386,11 @@
             </p>
           </div>
           <div class="service">
-            <div class="service-name">Firestore</div>
-            <div class="service-proto">gRPC &middot; :8088</div>
+            <div class="service-name">Cloud Tasks</div>
+            <div class="service-proto">gRPC &middot; :8089</div>
             <p class="service-desc">
-              Document CRUD, structured queries with equality and range filters.
-              OrderBy, limit, offset. Transactions with commit and rollback.
+              Queue and task CRUD. HTTP target dispatch.
+              Scheduling, retry with exponential backoff.
             </p>
           </div>
         </div>
@@ -587,15 +408,17 @@
             <div>
               <h3>Install</h3>
               <p>Single binary. No Docker, no JVM, no runtime dependencies.</p>
-              <code><span class="prompt">$</span> go install github.com/slokam-ai/localgcp@latest</code>
+              <code><span class="prompt">$</span> brew install slokam-ai/tap/localgcp
+<span class="comment"># or: go install github.com/slokam-ai/localgcp/cmd/localgcp@latest</span></code>
             </div>
           </div>
           <div class="step">
             <div class="step-num">02</div>
             <div>
               <h3>Start</h3>
-              <p>All four services in the foreground. In-memory by default, or persistent with --data-dir.</p>
-              <code><span class="prompt">$</span> localgcp up</code>
+              <p>All six services in the foreground. For Vertex AI with local models, start Ollama first.</p>
+              <code><span class="prompt">$</span> ollama pull gemma3          <span class="comment"># optional: for Vertex AI</span>
+<span class="prompt">$</span> localgcp up --vertex-model-map="gemini-2.5-flash=gemma3"</code>
             </div>
           </div>
           <div class="step">
@@ -623,11 +446,11 @@
               <ul class="comp-before">
                 <li>Spin up real GCP dev projects</li>
                 <li>Pay cloud bills for test environments</li>
+                <li>Burn Vertex AI credits on every prompt test</li>
                 <li>Manage individual emulators per service</li>
-                <li>Different setup for each service</li>
-                <li>No Cloud Storage emulator from Google</li>
+                <li>No Cloud Storage or Cloud Tasks emulator from Google</li>
+                <li>Leak API keys in CI/CD for AI tests</li>
                 <li>Requires internet connection</li>
-                <li>Shared environments, stepping on each other</li>
               </ul>
             </div>
             <div class="comp-col">
@@ -635,11 +458,11 @@
               <ul class="comp-after">
                 <li>One binary, starts in milliseconds</li>
                 <li>Zero cloud bills for dev and CI</li>
+                <li>Run Vertex AI against local Gemma/Llama</li>
                 <li>All services in one process</li>
-                <li>Unified CLI, consistent behavior</li>
-                <li>Cloud Storage included</li>
+                <li>Every service included, even the missing ones</li>
+                <li>No API keys needed, ever</li>
                 <li>Works fully offline</li>
-                <li>Each developer gets their own instance</li>
               </ul>
             </div>
           </div>
@@ -650,7 +473,7 @@
 
       <section>
         <div class="quote">
-          AWS has LocalStack. GCP has had nothing equivalent.
+          AWS has LocalStack. GCP had nothing equivalent.
           Fragmented emulators, inconsistent APIs, missing services.
           Until now.
         </div>
@@ -658,10 +481,11 @@
 
       <section class="cta">
         <h2>Start building locally</h2>
-        <p>20MB binary. 79 tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
+        <p>Six services. 137 tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
         <a href="https://github.com/slokam-ai/localgcp" class="cta-btn">View on GitHub</a>
         <span class="cta-install">
-          or: <a href="https://github.com/slokam-ai/localgcp#quick-start">go install github.com/slokam-ai/localgcp@latest</a>
+          or: <a href="/docs/">read the docs</a> &middot;
+          <a href="https://github.com/slokam-ai/localgcp/releases">download a binary</a>
         </span>
       </section>
 
@@ -678,9 +502,7 @@
     const toggle = document.getElementById('theme-toggle');
     const html = document.documentElement;
     const stored = localStorage.getItem('theme');
-    if (stored) {
-      html.setAttribute('data-theme', stored);
-    }
+    if (stored) html.setAttribute('data-theme', stored);
     toggle.addEventListener('click', () => {
       const current = html.getAttribute('data-theme');
       const next = current === 'dark' ? 'light' : 'dark';
