@@ -545,3 +545,75 @@ func decodeBody(t *testing.T, resp *http.Response, v interface{}) {
 		t.Fatalf("decode body: %v", err)
 	}
 }
+
+// --- Signed URL tests ---
+
+func TestSignedURLGenerate(t *testing.T) {
+	base := testServer(t)
+
+	// Create bucket and upload object.
+	postJSON(t, base+"/storage/v1/b?project=test", fmt.Sprintf(`{"name":%q}`, "sign-bucket"))
+	uploadSimple(t, base, "sign-bucket", "doc.txt", "signed content")
+
+	// Generate signed URL.
+	body := `{"bucket":"sign-bucket","object":"doc.txt","expires":600}`
+	resp, err := http.Post(base+"/_localgcp/sign", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("sign request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("sign status: %d", resp.StatusCode)
+	}
+
+	var result map[string]string
+	json.NewDecoder(resp.Body).Decode(&result)
+	signedURL := result["signedUrl"]
+	if signedURL == "" {
+		t.Fatal("empty signedUrl")
+	}
+	if !strings.Contains(signedURL, "X-Goog-Signature=localgcp") {
+		t.Fatalf("signed URL missing marker: %s", signedURL)
+	}
+	if !strings.Contains(signedURL, "X-Goog-Expires=600") {
+		t.Fatalf("signed URL missing expires: %s", signedURL)
+	}
+}
+
+func TestSignedURLDownload(t *testing.T) {
+	base := testServer(t)
+
+	// Create bucket and upload object.
+	postJSON(t, base+"/storage/v1/b?project=test", fmt.Sprintf(`{"name":%q}`, "sign-dl-bucket"))
+	uploadSimple(t, base, "sign-dl-bucket", "file.txt", "hello signed")
+
+	// Download via signed URL style path (XML API with query params).
+	url := base + "/sign-dl-bucket/file.txt?X-Goog-Signature=localgcp&X-Goog-Expires=3600"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("signed download: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("signed download status: %d", resp.StatusCode)
+	}
+	data, _ := io.ReadAll(resp.Body)
+	if string(data) != "hello signed" {
+		t.Fatalf("wrong content: %q", string(data))
+	}
+}
+
+func uploadSimple(t *testing.T, base, bucket, object, content string) {
+	t.Helper()
+	url := fmt.Sprintf("%s/upload/storage/v1/b/%s/o?name=%s&uploadType=media", base, bucket, object)
+	req, _ := http.NewRequest(http.MethodPost, url, strings.NewReader(content))
+	req.Header.Set("Content-Type", "text/plain")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("upload: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("upload status: %d", resp.StatusCode)
+	}
+}

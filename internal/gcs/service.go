@@ -93,6 +93,7 @@ func (s *Service) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/storage/v1/b/", s.route)
 	mux.HandleFunc("/upload/storage/v1/b/", s.handleUpload)
 	mux.HandleFunc("/download/storage/v1/b/", s.handleDownload)
+	mux.HandleFunc("/_localgcp/sign", s.handleSign)
 	mux.HandleFunc("/", s.handleDefault)
 }
 
@@ -545,6 +546,48 @@ func (s *Service) handleResumableChunk(w http.ResponseWriter, r *http.Request, b
 }
 
 // --- Middleware and default handler ---
+
+// handleSign generates a signed URL for a given bucket/object.
+// POST /_localgcp/sign with JSON body {"bucket":"b","object":"o","expires":3600}
+// Returns {"signedUrl":"http://host/b/o?X-Goog-Signature=localgcp&X-Goog-Expires=3600"}
+//
+// This is a convenience endpoint. The Go SDK's storage.SignedURL() works client-side
+// with the dummy credentials from internal/auth without hitting this endpoint.
+// This endpoint exists for non-Go clients that need server-side URL generation.
+func (s *Service) handleSign(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "methodNotAllowed", "Method not allowed")
+		return
+	}
+
+	var req struct {
+		Bucket  string `json:"bucket"`
+		Object  string `json:"object"`
+		Expires int    `json:"expires"` // seconds
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid", "Invalid JSON body")
+		return
+	}
+	if req.Bucket == "" || req.Object == "" {
+		writeError(w, http.StatusBadRequest, "invalid", "bucket and object are required")
+		return
+	}
+	if req.Expires <= 0 {
+		req.Expires = 3600
+	}
+
+	// Build signed URL pointing to this emulator's XML API path.
+	scheme := "http"
+	host := r.Host
+	signedURL := fmt.Sprintf("%s://%s/%s/%s?X-Goog-Signature=localgcp&X-Goog-Expires=%d",
+		scheme, host, req.Bucket, req.Object, req.Expires)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"signedUrl": signedURL,
+	})
+}
 
 func (s *Service) handleDefault(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
