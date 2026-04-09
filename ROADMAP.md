@@ -34,9 +34,9 @@ Fill the gaps that matter most for real-world adoption.
 - [x] Vertex AI Gemini API — generateContent + embeddings via Ollama proxy
 - [x] Stub backend for CI/CD (deterministic responses, no model needed)
 - [x] Model alias registry (gemini-2.5-flash -> llama3.2, etc.)
-- [ ] Streaming (streamGenerateContent) — Ollama NDJSON to Vertex SSE
-- [ ] Multi-provider backends (OpenAI, Anthropic adapters)
-- [ ] Tool/function calling support
+- [x] Streaming (streamGenerateContent) — Ollama NDJSON to Vertex SSE
+- [x] Multi-provider backends (OpenAI, Anthropic adapters)
+- [x] Tool/function calling support
 - [ ] Multimodal (image/audio input)
 
 ## Phase 3 — Security and observability

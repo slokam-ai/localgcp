@@ -53,7 +53,7 @@ func upCmd() *cobra.Command {
 			srv.Register(secretmanager.New(cfg.DataDir, cfg.Quiet), cfg.PortSecretManager)
 			srv.Register(firestore.New(cfg.DataDir, cfg.Quiet), cfg.PortFirestore)
 			srv.Register(cloudtasks.New(cfg.DataDir, cfg.Quiet), cfg.PortCloudTasks)
-			srv.Register(vertexai.New(cfg.DataDir, cfg.Quiet, cfg.OllamaHost, cfg.VertexModelMap), cfg.PortVertexAI)
+			srv.Register(vertexai.New(cfg.DataDir, cfg.Quiet, cfg.OllamaHost, cfg.VertexModelMap, cfg.VertexBackend, cfg.VertexAPIKey), cfg.PortVertexAI)
 
 			return srv.Run()
 		},
@@ -68,6 +68,8 @@ func upCmd() *cobra.Command {
 	cmd.Flags().IntVar(&cfg.PortVertexAI, "port-vertexai", cfg.PortVertexAI, "Port for Vertex AI")
 	cmd.Flags().StringVar(&cfg.OllamaHost, "ollama-host", cfg.OllamaHost, "Ollama API host for Vertex AI backend")
 	cmd.Flags().StringVar(&cfg.VertexModelMap, "vertex-model-map", "", "Model alias mapping (e.g. gemini-2.5-flash=llama3.2)")
+	cmd.Flags().StringVar(&cfg.VertexBackend, "vertex-backend", "", "Vertex AI backend: ollama (default), openai, anthropic, stub")
+	cmd.Flags().StringVar(&cfg.VertexAPIKey, "vertex-api-key", "", "API key for OpenAI/Anthropic Vertex AI backends")
 	cmd.Flags().BoolVarP(&cfg.Quiet, "quiet", "q", false, "Suppress request logging (for CI)")
 
 	return cmd

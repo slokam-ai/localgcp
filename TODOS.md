@@ -10,17 +10,12 @@
 
 ## Vertex AI Emulator
 
-### Streaming support (streamGenerateContent)
-- **What:** Translate Ollama NDJSON streaming to Vertex SSE streaming for real-time token output.
-- **Why:** Almost all production AI apps use streaming. Without it, the emulator is limited to batch responses.
-- **Context:** Ollama streams NDJSON (one JSON object per line). Vertex REST API uses server-sent events. Translation is line-by-line. ~100 lines.
-- **Depends on:** MVP Vertex AI emulator (generateContent + embedContent).
+### ~~Streaming support (streamGenerateContent)~~ (DONE)
+- Ollama NDJSON to Vertex JSON array streaming. Stub backend splits into word-level chunks.
 
-### Multi-provider support (OpenAI, Anthropic adapters)
-- **What:** Add OpenAI and Anthropic backend adapters alongside Ollama.
-- **Why:** Lets developers test model migration without rewriting GCP code.
-- **Context:** Each adapter translates Vertex API shape to the provider's API shape. Same Backend interface, different implementation. ~100 lines per adapter.
-- **Depends on:** MVP Vertex AI emulator.
+### ~~Multi-provider support (OpenAI, Anthropic adapters)~~ (DONE)
+- OpenAI and Anthropic backend adapters via `--vertex-backend` flag.
+- Full streaming and tool/function calling support across all backends.
 
 ## Phase 3
 
