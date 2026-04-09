@@ -20,6 +20,9 @@ type Config struct {
 	PortFirestore     int
 	PortCloudTasks    int
 	PortVertexAI      int
+	PortKMS           int
+	PortLogging       int
+	PortCloudRun      int
 	DataDir           string
 	Quiet             bool
 	OllamaHost        string
@@ -37,6 +40,9 @@ func DefaultConfig() Config {
 		PortFirestore:     8088,
 		PortCloudTasks:    8089,
 		PortVertexAI:      8090,
+		PortKMS:           8091,
+		PortLogging:       8092,
+		PortCloudRun:      8093,
 		OllamaHost:        "http://localhost:11434",
 	}
 }
