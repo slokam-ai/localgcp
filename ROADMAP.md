@@ -61,8 +61,8 @@ Containers start on first connection, not at startup. Opt-in via `--services` fl
 - [x] Bigtable (google/cloud-sdk:emulators, gRPC :9094)
 - [x] Cloud SQL (postgres:16-alpine, TCP :5432)
 - [x] Memorystore (redis:7-alpine, TCP :6379)
-- [ ] Data persistence for orchestrated containers (volume mounts)
-- [ ] `localgcp pull` command (pre-fetch images)
+- [x] `localgcp pull` command (pre-fetch images)
+- [x] Data persistence for orchestrated containers (Cloud SQL, Memorystore volume mounts)
 
 ## Distribution milestones
 

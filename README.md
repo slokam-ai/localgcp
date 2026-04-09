@@ -226,6 +226,7 @@ Your GCP client libraries work against localgcp with zero code changes (except S
 ```
 localgcp up [flags]        Start all services (foreground)
 localgcp env [flags]       Print export statements for client libraries
+localgcp pull [flags]      Pre-fetch Docker images for orchestrated services
 localgcp --version         Print version
 ```
 
@@ -283,6 +284,24 @@ See [ROADMAP.md](ROADMAP.md) for what's coming next.
 - **CI/CD testing**: Ephemeral emulator starts in milliseconds, no cloud credentials needed
 - **Offline development**: Works without internet access
 - **Integration testing**: Test against real GCP client libraries, not mocks
+
+## Troubleshooting
+
+### macOS "Not Opened" / Gatekeeper warning
+
+If macOS shows "localgcp Not Opened" after installing via Homebrew, run:
+
+```bash
+xattr -d com.apple.quarantine $(which localgcp)
+```
+
+Or reinstall with the latest formula (v0.5.1+) which fixes this:
+
+```bash
+brew untap slokam-ai/tap 2>/dev/null
+brew tap slokam-ai/tap
+brew install slokam-ai/tap/localgcp
+```
 
 ## Building from source
 

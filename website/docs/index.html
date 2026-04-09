@@ -480,6 +480,40 @@
     fmt.<span class="func">Println</span>(<span class="string">"localgcp is working!"</span>)
 }</pre>
 
+      <h2>Pre-fetching Docker images</h2>
+
+      <p>Orchestrated services pull their Docker images on first connection (~30s). To avoid this delay, pre-fetch images ahead of time:</p>
+
+<pre class="code-block"><span class="comment"># Pull all orchestrated service images</span>
+<span class="prompt">$</span> localgcp pull
+
+<span class="comment"># Or pull specific services only</span>
+<span class="prompt">$</span> localgcp pull --services=spanner,cloudsql</pre>
+
+      <p>After pulling, first-request latency drops to ~3s (container start only).</p>
+
+      <h2>Data persistence</h2>
+
+      <p>Native services persist data via <code>--data-dir</code>. Orchestrated services that support persistence (Cloud SQL and Memorystore) also mount volumes when <code>--data-dir</code> is set:</p>
+
+<pre class="code-block"><span class="prompt">$</span> localgcp up --data-dir=./.localgcp --services=cloudsql,memorystore</pre>
+
+      <p>Spanner and Bigtable emulators are ephemeral only (the official emulators don't support disk persistence).</p>
+
+      <h2>Troubleshooting</h2>
+
+      <h3>macOS Gatekeeper: "localgcp Not Opened"</h3>
+
+      <p>If macOS blocks the binary after installing via Homebrew, run:</p>
+
+<pre class="code-block"><span class="prompt">$</span> xattr -d com.apple.quarantine $(which localgcp)</pre>
+
+      <p>Or reinstall with the latest formula (v0.5.1+) which fixes this:</p>
+
+<pre class="code-block"><span class="prompt">$</span> brew untap slokam-ai/tap 2>/dev/null
+<span class="prompt">$</span> brew tap slokam-ai/tap
+<span class="prompt">$</span> brew install slokam-ai/tap/localgcp</pre>
+
     </main>
   </div>
 
