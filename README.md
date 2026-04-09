@@ -31,7 +31,7 @@ Also available via Docker and pre-built binaries:
 
 ```bash
 # Docker
-docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 -p 8089:8089 -p 8090:8090 ghcr.io/slokam-ai/localgcp
+docker run --rm -p 4443:4443 -p 8085:8085 -p 8086:8086 -p 8088:8088 -p 8089:8089 -p 8090:8090 -p 8091:8091 -p 8092:8092 -p 8093:8093 ghcr.io/slokam-ai/localgcp
 
 # Pre-built binary
 # Download from https://github.com/slokam-ai/localgcp/releases

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Getting Started - localgcp docs</title>
-  <meta name="description" content="Install and configure localgcp, the unified GCP emulator. One binary, six services, zero cloud bills.">
+  <meta name="description" content="Install and configure localgcp, the unified GCP emulator. One binary, nine services, zero cloud bills.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -246,11 +246,14 @@
       <a href="/docs/firestore.html" class="sidebar-link">Firestore</a>
       <a href="/docs/secret-manager.html" class="sidebar-link">Secret Manager</a>
       <a href="/docs/cloud-tasks.html" class="sidebar-link">Cloud Tasks</a>
+      <a href="/docs/cloud-kms.html" class="sidebar-link">Cloud KMS</a>
+      <a href="/docs/cloud-logging.html" class="sidebar-link">Cloud Logging</a>
+      <a href="/docs/cloud-run.html" class="sidebar-link">Cloud Run</a>
     </aside>
 
     <main class="content">
       <h1>Getting Started</h1>
-      <div class="subtitle">one binary, six services, zero cloud bills</div>
+      <div class="subtitle">one binary, nine services, zero cloud bills</div>
 
       <h2>Installation</h2>
 
@@ -261,6 +264,7 @@
 <pre class="code-block"><span class="prompt">$</span> docker run --rm \
     -p 4443:4443 -p 8085:8085 -p 8086:8086 \
     -p 8088:8088 -p 8089:8089 -p 8090:8090 \
+    -p 8091:8091 -p 8092:8092 -p 8093:8093 \
     ghcr.io/slokam-ai/localgcp</pre>
 
       <h3>Pre-built binary</h3>
@@ -271,7 +275,7 @@
 
       <h2>Starting the emulator</h2>
 
-      <p>Start all six services in the foreground:</p>
+      <p>Start all nine services in the foreground:</p>
 <pre class="code-block"><span class="prompt">$</span> localgcp up</pre>
 
       <p>With all available flags:</p>
@@ -283,6 +287,9 @@
     --port-firestore=8088 \
     --port-cloudtasks=8089 \
     --port-vertexai=8090 \
+    --port-kms=8091 \
+    --port-logging=8092 \
+    --port-cloudrun=8093 \
     --ollama-host=http://localhost:11434 \
     --vertex-model-map=<span class="string">"gemini-2.5-flash=gemma3"</span> \
     --quiet</pre>
@@ -361,6 +368,27 @@
             <td>REST</td>
             <td><code>8090</code></td>
             <td><code>--port-vertexai</code></td>
+            <td>(manual config)</td>
+          </tr>
+          <tr>
+            <td>Cloud KMS</td>
+            <td>gRPC</td>
+            <td><code>8091</code></td>
+            <td><code>--port-kms</code></td>
+            <td>(manual config)</td>
+          </tr>
+          <tr>
+            <td>Cloud Logging</td>
+            <td>gRPC</td>
+            <td><code>8092</code></td>
+            <td><code>--port-logging</code></td>
+            <td>(manual config)</td>
+          </tr>
+          <tr>
+            <td>Cloud Run</td>
+            <td>gRPC</td>
+            <td><code>8093</code></td>
+            <td><code>--port-cloudrun</code></td>
             <td>(manual config)</td>
           </tr>
         </tbody>

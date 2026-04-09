@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Secret Manager - localgcp docs</title>
-  <meta name="description" content="Emulate Google Cloud Secret Manager locally. Secret CRUD, versioning, state management.">
+  <title>Cloud Logging - localgcp docs</title>
+  <meta name="description" content="Emulate Google Cloud Logging locally. Write, query, and filter log entries.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -147,26 +147,26 @@
       <a href="/docs/cloud-storage.html" class="sidebar-link">Cloud Storage</a>
       <a href="/docs/pubsub.html" class="sidebar-link">Pub/Sub</a>
       <a href="/docs/firestore.html" class="sidebar-link">Firestore</a>
-      <a href="/docs/secret-manager.html" class="sidebar-link active">Secret Manager</a>
+      <a href="/docs/secret-manager.html" class="sidebar-link">Secret Manager</a>
       <a href="/docs/cloud-tasks.html" class="sidebar-link">Cloud Tasks</a>
       <a href="/docs/cloud-kms.html" class="sidebar-link">Cloud KMS</a>
-      <a href="/docs/cloud-logging.html" class="sidebar-link">Cloud Logging</a>
+      <a href="/docs/cloud-logging.html" class="sidebar-link active">Cloud Logging</a>
       <a href="/docs/cloud-run.html" class="sidebar-link">Cloud Run</a>
     </aside>
 
     <main class="content">
-      <h1>Secret Manager</h1>
-      <div class="subtitle">gRPC &middot; port 8086</div>
+      <h1>Cloud Logging</h1>
+      <div class="subtitle">gRPC &middot; port 8092</div>
 
       <h2>Configuration</h2>
 
       <div class="callout">
-        <strong>No env var.</strong> Secret Manager has no official <code>*_EMULATOR_HOST</code> environment variable. You must configure the endpoint manually in your client code.
+        <strong>No env var.</strong> Cloud Logging has no official <code>*_EMULATOR_HOST</code> environment variable. You must configure the endpoint manually in your client code.
       </div>
 
       <h2>Go SDK example</h2>
 
-      <p>Create a secret, add a version, and access it:</p>
+      <p>Write log entries with severity levels and list them back with a filter:</p>
 <pre class="code-block"><span class="keyword">package</span> main
 
 <span class="keyword">import</span> (
@@ -174,19 +174,21 @@
     <span class="string">"fmt"</span>
     <span class="string">"log"</span>
 
-    secretmanager <span class="string">"cloud.google.com/go/secretmanager/apiv1"</span>
-    smpb <span class="string">"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"</span>
+    logging <span class="string">"cloud.google.com/go/logging/apiv2"</span>
+    loggingpb <span class="string">"cloud.google.com/go/logging/apiv2/loggingpb"</span>
     <span class="string">"google.golang.org/api/option"</span>
     <span class="string">"google.golang.org/grpc"</span>
     <span class="string">"google.golang.org/grpc/credentials/insecure"</span>
+    ltype <span class="string">"google.golang.org/genproto/googleapis/logging/type"</span>
+    monitoredres <span class="string">"google.golang.org/genproto/googleapis/api/monitoredres"</span>
 )
 
 <span class="keyword">func</span> <span class="func">main</span>() {
     ctx := context.<span class="func">Background</span>()
 
     <span class="comment">// Connect to localgcp (no TLS, no auth)</span>
-    client, err := secretmanager.<span class="func">NewClient</span>(ctx,
-        option.<span class="func">WithEndpoint</span>(<span class="string">"localhost:8086"</span>),
+    client, err := logging.<span class="func">NewClient</span>(ctx,
+        option.<span class="func">WithEndpoint</span>(<span class="string">"localhost:8092"</span>),
         option.<span class="func">WithoutAuthentication</span>(),
         option.<span class="func">WithGRPCDialOption</span>(grpc.<span class="func">WithTransportCredentials</span>(
             insecure.<span class="func">NewCredentials</span>(),
@@ -199,14 +201,29 @@
 
     project := <span class="string">"projects/my-project"</span>
 
-    <span class="comment">// Create a secret</span>
-    secret, err := client.<span class="func">CreateSecret</span>(ctx, &amp;smpb.CreateSecretRequest{
-        Parent:   project,
-        SecretId: <span class="string">"db-password"</span>,
-        Secret:   &amp;smpb.Secret{
-            Replication: &amp;smpb.Replication{
-                Replication: &amp;smpb.Replication_Automatic_{
-                    Automatic: &amp;smpb.Replication_Automatic{},
+    <span class="comment">// Write log entries with severity</span>
+    err = client.<span class="func">WriteLogEntries</span>(ctx, &amp;loggingpb.WriteLogEntriesRequest{
+        LogName:  project + <span class="string">"/logs/my-service"</span>,
+        Resource: &amp;monitoredres.MonitoredResource{
+            Type: <span class="string">"global"</span>,
+            Labels: <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>{
+                <span class="string">"project_id"</span>: <span class="string">"my-project"</span>,
+            },
+        },
+        Entries: []*loggingpb.LogEntry{
+            {
+                Severity: ltype.LogSeverity_INFO,
+                Payload:  &amp;loggingpb.LogEntry_TextPayload{
+                    TextPayload: <span class="string">"Server started on port 8080"</span>,
+                },
+                Labels: <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>{
+                    <span class="string">"env"</span>: <span class="string">"dev"</span>,
+                },
+            },
+            {
+                Severity: ltype.LogSeverity_ERROR,
+                Payload:  &amp;loggingpb.LogEntry_TextPayload{
+                    TextPayload: <span class="string">"Connection refused: database unreachable"</span>,
                 },
             },
         },
@@ -215,67 +232,38 @@
         log.<span class="func">Fatal</span>(err)
     }
 
-    <span class="comment">// Add a version with the secret value</span>
-    version, err := client.<span class="func">AddSecretVersion</span>(ctx, &amp;smpb.AddSecretVersionRequest{
-        Parent:  secret.Name,
-        Payload: &amp;smpb.SecretPayload{Data: []<span class="func">byte</span>(<span class="string">"s3cret-p@ss"</span>)},
+    <span class="comment">// List entries with a filter (e.g. only errors)</span>
+    it := client.<span class="func">ListLogEntries</span>(ctx, &amp;loggingpb.ListLogEntriesRequest{
+        ResourceNames: []<span class="type">string</span>{project},
+        Filter:        <span class="string">"severity &gt;= ERROR"</span>,
     })
-    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
-        log.<span class="func">Fatal</span>(err)
-    }
 
-    <span class="comment">// Access the secret (by version or "latest")</span>
-    resp, err := client.<span class="func">AccessSecretVersion</span>(ctx, &amp;smpb.AccessSecretVersionRequest{
-        Name: version.Name,  <span class="comment">// or: secret.Name + "/versions/latest"</span>
-    })
-    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
-        log.<span class="func">Fatal</span>(err)
+    <span class="keyword">for</span> {
+        entry, err := it.<span class="func">Next</span>()
+        <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+            <span class="keyword">break</span>
+        }
+        fmt.<span class="func">Printf</span>(<span class="string">"[%s] %s\n"</span>, entry.Severity, entry.<span class="func">GetTextPayload</span>())
     }
-
-    fmt.<span class="func">Printf</span>(<span class="string">"Secret: %s\n"</span>, resp.Payload.Data)
 }</pre>
 
       <h2>Features</h2>
 
       <ul>
-        <li><strong>Secret CRUD</strong> -- create, get, list, delete secrets</li>
-        <li><strong>Versioning</strong> -- add multiple versions to a secret</li>
-        <li><strong>Access by version</strong> -- fetch by version number (e.g. <code>versions/1</code>) or <code>versions/latest</code></li>
-        <li><strong>State management</strong> -- enable, disable, destroy individual versions</li>
+        <li><strong>Write log entries</strong> -- write entries with severity levels, labels, and monitored resources</li>
+        <li><strong>List entries with filtering</strong> -- filter by severity, text payload, and log name</li>
+        <li><strong>List log names</strong> -- list distinct log names within a project</li>
+        <li><strong>Delete logs</strong> -- delete all entries for a given log name</li>
+        <li><strong>Bounded in-memory store</strong> -- retains up to 10,000 entries; oldest are evicted automatically</li>
       </ul>
-
-      <h3>Version states</h3>
-
-      <p>Each secret version has a state that controls access:</p>
-
-      <ul>
-        <li><strong>ENABLED</strong> -- the version can be accessed (default for new versions)</li>
-        <li><strong>DISABLED</strong> -- the version exists but cannot be accessed</li>
-        <li><strong>DESTROYED</strong> -- the version payload is deleted permanently</li>
-      </ul>
-
-<pre class="code-block"><span class="comment">// Disable a version</span>
-_, err = client.<span class="func">DisableSecretVersion</span>(ctx, &amp;smpb.DisableSecretVersionRequest{
-    Name: secret.Name + <span class="string">"/versions/1"</span>,
-})
-
-<span class="comment">// Re-enable it</span>
-_, err = client.<span class="func">EnableSecretVersion</span>(ctx, &amp;smpb.EnableSecretVersionRequest{
-    Name: secret.Name + <span class="string">"/versions/1"</span>,
-})
-
-<span class="comment">// Destroy it permanently</span>
-_, err = client.<span class="func">DestroySecretVersion</span>(ctx, &amp;smpb.DestroySecretVersionRequest{
-    Name: secret.Name + <span class="string">"/versions/1"</span>,
-})</pre>
 
       <h2>Not yet supported</h2>
 
       <ul>
-        <li>IAM bindings</li>
-        <li>Replication policies</li>
-        <li>Secret rotation</li>
-        <li>Labels and annotations</li>
+        <li>Structured payload queries</li>
+        <li>Log sinks</li>
+        <li>Log-based metrics</li>
+        <li>Streaming tail (<code>TailLogEntries</code>)</li>
       </ul>
 
     </main>

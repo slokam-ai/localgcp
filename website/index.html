@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>localgcp - The unified GCP emulator</title>
-  <meta name="description" content="One binary, six services, zero cloud bills. Run Vertex AI against local models via Ollama. Emulate Cloud Storage, Pub/Sub, Firestore, and more.">
+  <meta name="description" content="One binary, nine services, zero cloud bills. Run Vertex AI against local models via Ollama. Emulate Cloud Storage, Pub/Sub, Firestore, and more.">
   <meta property="og:title" content="localgcp - Run GCP locally. Even Vertex AI.">
-  <meta property="og:description" content="One binary, six services, zero cloud bills. Proxy Vertex AI to local LLMs via Ollama.">
+  <meta property="og:description" content="One binary, nine services, zero cloud bills. Proxy Vertex AI to local LLMs via Ollama.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://localgcp.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -303,7 +303,7 @@
         <h1>localgcp</h1>
         <div class="hero-tagline">{ the unified GCP emulator }</div>
         <p class="hero-desc">
-          One binary, six services, zero cloud bills.
+          One binary, nine services, zero cloud bills.
           Develop against GCP locally, including Vertex AI with real local inference.
         </p>
         <div class="hero-highlight">
@@ -336,7 +336,7 @@
 
       <section>
         <div class="section-label">What you get</div>
-        <h2>Six services. One process.</h2>
+        <h2>Nine services. One process.</h2>
         <p>
           Your GCP client libraries already support emulator host env vars.
           Point them at localhost and your existing code works with zero changes.
@@ -393,6 +393,30 @@
               Scheduling, retry with exponential backoff.
             </p>
           </div>
+          <div class="service">
+            <div class="service-name">Cloud KMS</div>
+            <div class="service-proto">gRPC &middot; :8091</div>
+            <p class="service-desc">
+              Encrypt/decrypt, asymmetric sign, HMAC.
+              KeyRing and CryptoKey management. In-memory keys.
+            </p>
+          </div>
+          <div class="service">
+            <div class="service-name">Cloud Logging</div>
+            <div class="service-proto">gRPC &middot; :8092</div>
+            <p class="service-desc">
+              Write and query log entries. Filter by severity,
+              text payload, log name. Bounded in-memory store.
+            </p>
+          </div>
+          <div class="service">
+            <div class="service-name">Cloud Run</div>
+            <div class="service-proto">gRPC &middot; :8093</div>
+            <p class="service-desc">
+              Service CRUD with immediate operations.
+              Auto-generated URIs. No polling required.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -416,7 +440,7 @@
             <div class="step-num">02</div>
             <div>
               <h3>Start</h3>
-              <p>All six services in the foreground. For Vertex AI with local models, start Ollama first.</p>
+              <p>All nine services in the foreground. For Vertex AI with local models, start Ollama first.</p>
               <code><span class="prompt">$</span> ollama pull gemma3          <span class="comment"># optional: for Vertex AI</span>
 <span class="prompt">$</span> localgcp up --vertex-model-map="gemini-2.5-flash=gemma3"</code>
             </div>
@@ -481,7 +505,7 @@
 
       <section class="cta">
         <h2>Start building locally</h2>
-        <p>Six services. 137 tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
+        <p>Nine services. 160+ tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
         <a href="https://github.com/slokam-ai/localgcp" class="cta-btn">View on GitHub</a>
         <span class="cta-install">
           or: <a href="/docs/">read the docs</a> &middot;

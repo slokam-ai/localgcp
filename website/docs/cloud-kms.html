@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Secret Manager - localgcp docs</title>
-  <meta name="description" content="Emulate Google Cloud Secret Manager locally. Secret CRUD, versioning, state management.">
+  <title>Cloud KMS - localgcp docs</title>
+  <meta name="description" content="Emulate Google Cloud KMS locally. Encrypt/decrypt, sign/verify, HMAC, key management.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -147,35 +147,36 @@
       <a href="/docs/cloud-storage.html" class="sidebar-link">Cloud Storage</a>
       <a href="/docs/pubsub.html" class="sidebar-link">Pub/Sub</a>
       <a href="/docs/firestore.html" class="sidebar-link">Firestore</a>
-      <a href="/docs/secret-manager.html" class="sidebar-link active">Secret Manager</a>
+      <a href="/docs/secret-manager.html" class="sidebar-link">Secret Manager</a>
       <a href="/docs/cloud-tasks.html" class="sidebar-link">Cloud Tasks</a>
-      <a href="/docs/cloud-kms.html" class="sidebar-link">Cloud KMS</a>
+      <a href="/docs/cloud-kms.html" class="sidebar-link active">Cloud KMS</a>
       <a href="/docs/cloud-logging.html" class="sidebar-link">Cloud Logging</a>
       <a href="/docs/cloud-run.html" class="sidebar-link">Cloud Run</a>
     </aside>
 
     <main class="content">
-      <h1>Secret Manager</h1>
-      <div class="subtitle">gRPC &middot; port 8086</div>
+      <h1>Cloud KMS</h1>
+      <div class="subtitle">gRPC &middot; port 8091</div>
 
       <h2>Configuration</h2>
 
       <div class="callout">
-        <strong>No env var.</strong> Secret Manager has no official <code>*_EMULATOR_HOST</code> environment variable. You must configure the endpoint manually in your client code.
+        <strong>No env var.</strong> Cloud KMS has no official <code>*_EMULATOR_HOST</code> environment variable. You must configure the endpoint manually in your client code.
       </div>
 
       <h2>Go SDK example</h2>
 
-      <p>Create a secret, add a version, and access it:</p>
+      <p>Create a key ring, create a symmetric crypto key, encrypt, and decrypt:</p>
 <pre class="code-block"><span class="keyword">package</span> main
 
 <span class="keyword">import</span> (
     <span class="string">"context"</span>
+    <span class="string">"encoding/base64"</span>
     <span class="string">"fmt"</span>
     <span class="string">"log"</span>
 
-    secretmanager <span class="string">"cloud.google.com/go/secretmanager/apiv1"</span>
-    smpb <span class="string">"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"</span>
+    kms <span class="string">"cloud.google.com/go/kms/apiv1"</span>
+    kmspb <span class="string">"cloud.google.com/go/kms/apiv1/kmspb"</span>
     <span class="string">"google.golang.org/api/option"</span>
     <span class="string">"google.golang.org/grpc"</span>
     <span class="string">"google.golang.org/grpc/credentials/insecure"</span>
@@ -185,8 +186,8 @@
     ctx := context.<span class="func">Background</span>()
 
     <span class="comment">// Connect to localgcp (no TLS, no auth)</span>
-    client, err := secretmanager.<span class="func">NewClient</span>(ctx,
-        option.<span class="func">WithEndpoint</span>(<span class="string">"localhost:8086"</span>),
+    client, err := kms.<span class="func">NewKeyManagementClient</span>(ctx,
+        option.<span class="func">WithEndpoint</span>(<span class="string">"localhost:8091"</span>),
         option.<span class="func">WithoutAuthentication</span>(),
         option.<span class="func">WithGRPCDialOption</span>(grpc.<span class="func">WithTransportCredentials</span>(
             insecure.<span class="func">NewCredentials</span>(),
@@ -197,17 +198,25 @@
     }
     <span class="keyword">defer</span> client.<span class="func">Close</span>()
 
-    project := <span class="string">"projects/my-project"</span>
+    location := <span class="string">"projects/my-project/locations/us-east1"</span>
 
-    <span class="comment">// Create a secret</span>
-    secret, err := client.<span class="func">CreateSecret</span>(ctx, &amp;smpb.CreateSecretRequest{
-        Parent:   project,
-        SecretId: <span class="string">"db-password"</span>,
-        Secret:   &amp;smpb.Secret{
-            Replication: &amp;smpb.Replication{
-                Replication: &amp;smpb.Replication_Automatic_{
-                    Automatic: &amp;smpb.Replication_Automatic{},
-                },
+    <span class="comment">// Create a key ring</span>
+    keyRing, err := client.<span class="func">CreateKeyRing</span>(ctx, &amp;kmspb.CreateKeyRingRequest{
+        Parent:    location,
+        KeyRingId: <span class="string">"my-key-ring"</span>,
+    })
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+
+    <span class="comment">// Create a symmetric encrypt/decrypt key</span>
+    key, err := client.<span class="func">CreateCryptoKey</span>(ctx, &amp;kmspb.CreateCryptoKeyRequest{
+        Parent:      keyRing.Name,
+        CryptoKeyId: <span class="string">"my-symmetric-key"</span>,
+        CryptoKey: &amp;kmspb.CryptoKey{
+            Purpose: kmspb.CryptoKey_ENCRYPT_DECRYPT,
+            VersionTemplate: &amp;kmspb.CryptoKeyVersionTemplate{
+                Algorithm: kmspb.CryptoKeyVersion_GOOGLE_SYMMETRIC_ENCRYPTION,
             },
         },
     })
@@ -215,67 +224,46 @@
         log.<span class="func">Fatal</span>(err)
     }
 
-    <span class="comment">// Add a version with the secret value</span>
-    version, err := client.<span class="func">AddSecretVersion</span>(ctx, &amp;smpb.AddSecretVersionRequest{
-        Parent:  secret.Name,
-        Payload: &amp;smpb.SecretPayload{Data: []<span class="func">byte</span>(<span class="string">"s3cret-p@ss"</span>)},
+    <span class="comment">// Encrypt</span>
+    encResp, err := client.<span class="func">Encrypt</span>(ctx, &amp;kmspb.EncryptRequest{
+        Name:      key.Name,
+        Plaintext: []<span class="func">byte</span>(<span class="string">"hello, localgcp"</span>),
     })
     <span class="keyword">if</span> err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
+    fmt.<span class="func">Printf</span>(<span class="string">"Ciphertext: %s\n"</span>, base64.StdEncoding.<span class="func">EncodeToString</span>(encResp.Ciphertext))
 
-    <span class="comment">// Access the secret (by version or "latest")</span>
-    resp, err := client.<span class="func">AccessSecretVersion</span>(ctx, &amp;smpb.AccessSecretVersionRequest{
-        Name: version.Name,  <span class="comment">// or: secret.Name + "/versions/latest"</span>
+    <span class="comment">// Decrypt</span>
+    decResp, err := client.<span class="func">Decrypt</span>(ctx, &amp;kmspb.DecryptRequest{
+        Name:       key.Name,
+        Ciphertext: encResp.Ciphertext,
     })
     <span class="keyword">if</span> err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
-
-    fmt.<span class="func">Printf</span>(<span class="string">"Secret: %s\n"</span>, resp.Payload.Data)
+    fmt.<span class="func">Printf</span>(<span class="string">"Plaintext: %s\n"</span>, decResp.Plaintext)
 }</pre>
 
       <h2>Features</h2>
 
       <ul>
-        <li><strong>Secret CRUD</strong> -- create, get, list, delete secrets</li>
-        <li><strong>Versioning</strong> -- add multiple versions to a secret</li>
-        <li><strong>Access by version</strong> -- fetch by version number (e.g. <code>versions/1</code>) or <code>versions/latest</code></li>
-        <li><strong>State management</strong> -- enable, disable, destroy individual versions</li>
+        <li><strong>KeyRing/CryptoKey CRUD</strong> -- create, get, list key rings and crypto keys</li>
+        <li><strong>Symmetric encrypt/decrypt</strong> -- encrypt and decrypt data with symmetric keys</li>
+        <li><strong>Asymmetric sign</strong> -- sign data with EC P256 and RSA 2048 keys</li>
+        <li><strong>GetPublicKey</strong> -- retrieve the public key for asymmetric keys</li>
+        <li><strong>HMAC sign/verify</strong> -- create and verify HMAC signatures</li>
+        <li><strong>CryptoKeyVersion management</strong> -- create, list, and destroy key versions</li>
       </ul>
-
-      <h3>Version states</h3>
-
-      <p>Each secret version has a state that controls access:</p>
-
-      <ul>
-        <li><strong>ENABLED</strong> -- the version can be accessed (default for new versions)</li>
-        <li><strong>DISABLED</strong> -- the version exists but cannot be accessed</li>
-        <li><strong>DESTROYED</strong> -- the version payload is deleted permanently</li>
-      </ul>
-
-<pre class="code-block"><span class="comment">// Disable a version</span>
-_, err = client.<span class="func">DisableSecretVersion</span>(ctx, &amp;smpb.DisableSecretVersionRequest{
-    Name: secret.Name + <span class="string">"/versions/1"</span>,
-})
-
-<span class="comment">// Re-enable it</span>
-_, err = client.<span class="func">EnableSecretVersion</span>(ctx, &amp;smpb.EnableSecretVersionRequest{
-    Name: secret.Name + <span class="string">"/versions/1"</span>,
-})
-
-<span class="comment">// Destroy it permanently</span>
-_, err = client.<span class="func">DestroySecretVersion</span>(ctx, &amp;smpb.DestroySecretVersionRequest{
-    Name: secret.Name + <span class="string">"/versions/1"</span>,
-})</pre>
 
       <h2>Not yet supported</h2>
 
       <ul>
-        <li>IAM bindings</li>
-        <li>Replication policies</li>
-        <li>Secret rotation</li>
-        <li>Labels and annotations</li>
+        <li>Key import</li>
+        <li>Rotation schedules</li>
+        <li>Raw encrypt/decrypt</li>
+        <li>Asymmetric decrypt</li>
+        <li>Key rings per location</li>
       </ul>
 
     </main>
