@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloud Logging - localgcp docs</title>
-  <meta name="description" content="Emulate Google Cloud Logging locally. Write, query, and filter log entries.">
+  <title>Cloud SQL - localgcp docs</title>
+  <meta name="description" content="Use Cloud SQL (PostgreSQL) locally via localgcp's Docker orchestrator. Lazy startup, zero config.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -150,125 +150,97 @@
       <a href="/docs/secret-manager.html" class="sidebar-link">Secret Manager</a>
       <a href="/docs/cloud-tasks.html" class="sidebar-link">Cloud Tasks</a>
       <a href="/docs/cloud-kms.html" class="sidebar-link">Cloud KMS</a>
-      <a href="/docs/cloud-logging.html" class="sidebar-link active">Cloud Logging</a>
+      <a href="/docs/cloud-logging.html" class="sidebar-link">Cloud Logging</a>
       <a href="/docs/cloud-run.html" class="sidebar-link">Cloud Run</a>
-      <div class="sidebar-section" style="margin-top:1rem"><div class="sidebar-label">Orchestrated</div></div>
       <a href="/docs/spanner.html" class="sidebar-link">Spanner</a>
       <a href="/docs/bigtable.html" class="sidebar-link">Bigtable</a>
-      <a href="/docs/cloud-sql.html" class="sidebar-link">Cloud SQL</a>
+      <a href="/docs/cloud-sql.html" class="sidebar-link active">Cloud SQL</a>
       <a href="/docs/memorystore.html" class="sidebar-link">Memorystore</a>
     </aside>
 
     <main class="content">
-      <h1>Cloud Logging</h1>
-      <div class="subtitle">gRPC &middot; port 8092</div>
-
-      <h2>Configuration</h2>
+      <h1>Cloud SQL</h1>
+      <div class="subtitle">TCP &middot; port 5432 &middot; orchestrated</div>
 
       <div class="callout">
-        <strong>No env var.</strong> Cloud Logging has no official <code>*_EMULATOR_HOST</code> environment variable. You must configure the endpoint manually in your client code.
+        <strong>Orchestrated service.</strong> Cloud SQL runs as a PostgreSQL 16 container managed by localgcp. Requires Docker. Container starts lazily on first connection.
       </div>
 
-      <h2>Go SDK example</h2>
+      <h2>Quick start</h2>
 
-      <p>Write log entries with severity levels and list them back with a filter:</p>
+<pre class="code-block"><span class="prompt">$</span> localgcp up --services=cloudsql</pre>
+
+      <h2>Connecting</h2>
+
+      <p>Cloud SQL exposes a standard PostgreSQL connection on <code>localhost:5432</code> with trust authentication (no password required). Connect with any Postgres client or driver:</p>
+
+<pre class="code-block"><span class="prompt">$</span> psql -h localhost -p 5432 -U postgres -d localgcp</pre>
+
+      <p>Works with <code>psql</code>, pgAdmin, DBeaver, or any PostgreSQL client library.</p>
+
+      <h2>Go example</h2>
+
+      <p>Connect with <code>database/sql</code> and <code>lib/pq</code> or <code>pgx</code>:</p>
+
 <pre class="code-block"><span class="keyword">package</span> main
 
 <span class="keyword">import</span> (
-    <span class="string">"context"</span>
+    <span class="string">"database/sql"</span>
     <span class="string">"fmt"</span>
     <span class="string">"log"</span>
 
-    logging <span class="string">"cloud.google.com/go/logging/apiv2"</span>
-    loggingpb <span class="string">"cloud.google.com/go/logging/apiv2/loggingpb"</span>
-    <span class="string">"google.golang.org/api/option"</span>
-    <span class="string">"google.golang.org/grpc"</span>
-    <span class="string">"google.golang.org/grpc/credentials/insecure"</span>
-    ltype <span class="string">"google.golang.org/genproto/googleapis/logging/type"</span>
-    monitoredres <span class="string">"google.golang.org/genproto/googleapis/api/monitoredres"</span>
+    _ <span class="string">"github.com/lib/pq"</span>
 )
 
 <span class="keyword">func</span> <span class="func">main</span>() {
-    ctx := context.<span class="func">Background</span>()
-
-    <span class="comment">// Connect to localgcp (no TLS, no auth)</span>
-    client, err := logging.<span class="func">NewClient</span>(ctx,
-        option.<span class="func">WithEndpoint</span>(<span class="string">"localhost:8092"</span>),
-        option.<span class="func">WithoutAuthentication</span>(),
-        option.<span class="func">WithGRPCDialOption</span>(grpc.<span class="func">WithTransportCredentials</span>(
-            insecure.<span class="func">NewCredentials</span>(),
-        )),
+    db, err := sql.<span class="func">Open</span>(<span class="string">"postgres"</span>,
+        <span class="string">"host=localhost port=5432 user=postgres dbname=localgcp sslmode=disable"</span>,
     )
     <span class="keyword">if</span> err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
-    <span class="keyword">defer</span> client.<span class="func">Close</span>()
+    <span class="keyword">defer</span> db.<span class="func">Close</span>()
 
-    project := <span class="string">"projects/my-project"</span>
-
-    <span class="comment">// Write log entries with severity</span>
-    err = client.<span class="func">WriteLogEntries</span>(ctx, &amp;loggingpb.WriteLogEntriesRequest{
-        LogName:  project + <span class="string">"/logs/my-service"</span>,
-        Resource: &amp;monitoredres.MonitoredResource{
-            Type: <span class="string">"global"</span>,
-            Labels: <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>{
-                <span class="string">"project_id"</span>: <span class="string">"my-project"</span>,
-            },
-        },
-        Entries: []*loggingpb.LogEntry{
-            {
-                Severity: ltype.LogSeverity_INFO,
-                Payload:  &amp;loggingpb.LogEntry_TextPayload{
-                    TextPayload: <span class="string">"Server started on port 8080"</span>,
-                },
-                Labels: <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>{
-                    <span class="string">"env"</span>: <span class="string">"dev"</span>,
-                },
-            },
-            {
-                Severity: ltype.LogSeverity_ERROR,
-                Payload:  &amp;loggingpb.LogEntry_TextPayload{
-                    TextPayload: <span class="string">"Connection refused: database unreachable"</span>,
-                },
-            },
-        },
-    })
-    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+    <span class="keyword">if</span> err := db.<span class="func">Ping</span>(); err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
-
-    <span class="comment">// List entries with a filter (e.g. only errors)</span>
-    it := client.<span class="func">ListLogEntries</span>(ctx, &amp;loggingpb.ListLogEntriesRequest{
-        ResourceNames: []<span class="type">string</span>{project},
-        Filter:        <span class="string">"severity &gt;= ERROR"</span>,
-    })
-
-    <span class="keyword">for</span> {
-        entry, err := it.<span class="func">Next</span>()
-        <span class="keyword">if</span> err != <span class="keyword">nil</span> {
-            <span class="keyword">break</span>
-        }
-        fmt.<span class="func">Printf</span>(<span class="string">"[%s] %s\n"</span>, entry.Severity, entry.<span class="func">GetTextPayload</span>())
-    }
+    fmt.<span class="func">Println</span>(<span class="string">"connected to Cloud SQL (localgcp)"</span>)
 }</pre>
 
-      <h2>Features</h2>
+      <h2>Python example</h2>
+
+      <p>Connect with <code>psycopg2</code>:</p>
+
+<pre class="code-block"><span class="keyword">import</span> psycopg2
+
+conn = psycopg2.<span class="func">connect</span>(
+    host=<span class="string">"localhost"</span>,
+    port=<span class="string">5432</span>,
+    user=<span class="string">"postgres"</span>,
+    dbname=<span class="string">"localgcp"</span>,
+)
+
+cur = conn.<span class="func">cursor</span>()
+cur.<span class="func">execute</span>(<span class="string">"SELECT 1"</span>)
+<span class="keyword">print</span>(cur.<span class="func">fetchone</span>())
+
+conn.<span class="func">close</span>()</pre>
+
+      <h2>How it works</h2>
 
       <ul>
-        <li><strong>Write log entries</strong> -- write entries with severity levels, labels, and monitored resources</li>
-        <li><strong>List entries with filtering</strong> -- filter by severity, text payload, and log name</li>
-        <li><strong>List log names</strong> -- list distinct log names within a project</li>
-        <li><strong>Delete logs</strong> -- delete all entries for a given log name</li>
-        <li><strong>Bounded in-memory store</strong> -- retains up to 10,000 entries; oldest are evicted automatically</li>
+        <li><strong>Lazy TCP proxy</strong> -- localgcp listens on port 5432 and starts the PostgreSQL container on first connection</li>
+        <li><strong>postgres:16-alpine</strong> -- lightweight PostgreSQL 16 image pulled automatically</li>
+        <li><strong>Trust authentication</strong> -- no password required, connections are accepted from localhost</li>
+        <li><strong>Database pre-created</strong> -- the <code>localgcp</code> database is created automatically on startup</li>
       </ul>
 
       <h2>Not yet supported</h2>
 
       <ul>
-        <li>Structured payload queries</li>
-        <li>Log sinks</li>
-        <li>Log-based metrics</li>
-        <li>Streaming tail (<code>TailLogEntries</code>)</li>
+        <li>Data persistence across restarts</li>
+        <li>Multiple databases</li>
+        <li>Cloud SQL Auth Proxy compatibility</li>
       </ul>
 
     </main>

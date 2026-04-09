@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloud Logging - localgcp docs</title>
-  <meta name="description" content="Emulate Google Cloud Logging locally. Write, query, and filter log entries.">
+  <title>Memorystore - localgcp docs</title>
+  <meta name="description" content="Use Memorystore (Redis) locally via localgcp's Docker orchestrator. Lazy startup, zero config.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -150,28 +150,36 @@
       <a href="/docs/secret-manager.html" class="sidebar-link">Secret Manager</a>
       <a href="/docs/cloud-tasks.html" class="sidebar-link">Cloud Tasks</a>
       <a href="/docs/cloud-kms.html" class="sidebar-link">Cloud KMS</a>
-      <a href="/docs/cloud-logging.html" class="sidebar-link active">Cloud Logging</a>
+      <a href="/docs/cloud-logging.html" class="sidebar-link">Cloud Logging</a>
       <a href="/docs/cloud-run.html" class="sidebar-link">Cloud Run</a>
-      <div class="sidebar-section" style="margin-top:1rem"><div class="sidebar-label">Orchestrated</div></div>
       <a href="/docs/spanner.html" class="sidebar-link">Spanner</a>
       <a href="/docs/bigtable.html" class="sidebar-link">Bigtable</a>
       <a href="/docs/cloud-sql.html" class="sidebar-link">Cloud SQL</a>
-      <a href="/docs/memorystore.html" class="sidebar-link">Memorystore</a>
+      <a href="/docs/memorystore.html" class="sidebar-link active">Memorystore</a>
     </aside>
 
     <main class="content">
-      <h1>Cloud Logging</h1>
-      <div class="subtitle">gRPC &middot; port 8092</div>
-
-      <h2>Configuration</h2>
+      <h1>Memorystore</h1>
+      <div class="subtitle">TCP &middot; port 6379 &middot; orchestrated</div>
 
       <div class="callout">
-        <strong>No env var.</strong> Cloud Logging has no official <code>*_EMULATOR_HOST</code> environment variable. You must configure the endpoint manually in your client code.
+        <strong>Orchestrated service.</strong> Memorystore runs as a Redis 7 container managed by localgcp. Requires Docker. Container starts lazily on first connection.
       </div>
 
-      <h2>Go SDK example</h2>
+      <h2>Quick start</h2>
 
-      <p>Write log entries with severity levels and list them back with a filter:</p>
+<pre class="code-block"><span class="prompt">$</span> localgcp up --services=memorystore</pre>
+
+      <h2>Connecting</h2>
+
+      <p>Use a standard Redis connection. Any Redis client works:</p>
+
+<pre class="code-block"><span class="prompt">$</span> redis-cli -h localhost -p 6379</pre>
+
+      <h2>Go example</h2>
+
+      <p>Connect with <code>github.com/redis/go-redis/v9</code>:</p>
+
 <pre class="code-block"><span class="keyword">package</span> main
 
 <span class="keyword">import</span> (
@@ -179,96 +187,56 @@
     <span class="string">"fmt"</span>
     <span class="string">"log"</span>
 
-    logging <span class="string">"cloud.google.com/go/logging/apiv2"</span>
-    loggingpb <span class="string">"cloud.google.com/go/logging/apiv2/loggingpb"</span>
-    <span class="string">"google.golang.org/api/option"</span>
-    <span class="string">"google.golang.org/grpc"</span>
-    <span class="string">"google.golang.org/grpc/credentials/insecure"</span>
-    ltype <span class="string">"google.golang.org/genproto/googleapis/logging/type"</span>
-    monitoredres <span class="string">"google.golang.org/genproto/googleapis/api/monitoredres"</span>
+    <span class="string">"github.com/redis/go-redis/v9"</span>
 )
 
 <span class="keyword">func</span> <span class="func">main</span>() {
     ctx := context.<span class="func">Background</span>()
 
-    <span class="comment">// Connect to localgcp (no TLS, no auth)</span>
-    client, err := logging.<span class="func">NewClient</span>(ctx,
-        option.<span class="func">WithEndpoint</span>(<span class="string">"localhost:8092"</span>),
-        option.<span class="func">WithoutAuthentication</span>(),
-        option.<span class="func">WithGRPCDialOption</span>(grpc.<span class="func">WithTransportCredentials</span>(
-            insecure.<span class="func">NewCredentials</span>(),
-        )),
-    )
-    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
-        log.<span class="func">Fatal</span>(err)
-    }
-    <span class="keyword">defer</span> client.<span class="func">Close</span>()
-
-    project := <span class="string">"projects/my-project"</span>
-
-    <span class="comment">// Write log entries with severity</span>
-    err = client.<span class="func">WriteLogEntries</span>(ctx, &amp;loggingpb.WriteLogEntriesRequest{
-        LogName:  project + <span class="string">"/logs/my-service"</span>,
-        Resource: &amp;monitoredres.MonitoredResource{
-            Type: <span class="string">"global"</span>,
-            Labels: <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>{
-                <span class="string">"project_id"</span>: <span class="string">"my-project"</span>,
-            },
-        },
-        Entries: []*loggingpb.LogEntry{
-            {
-                Severity: ltype.LogSeverity_INFO,
-                Payload:  &amp;loggingpb.LogEntry_TextPayload{
-                    TextPayload: <span class="string">"Server started on port 8080"</span>,
-                },
-                Labels: <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>{
-                    <span class="string">"env"</span>: <span class="string">"dev"</span>,
-                },
-            },
-            {
-                Severity: ltype.LogSeverity_ERROR,
-                Payload:  &amp;loggingpb.LogEntry_TextPayload{
-                    TextPayload: <span class="string">"Connection refused: database unreachable"</span>,
-                },
-            },
-        },
+    rdb := redis.<span class="func">NewClient</span>(&amp;redis.Options{
+        Addr: <span class="string">"localhost:6379"</span>,
     })
+    <span class="keyword">defer</span> rdb.<span class="func">Close</span>()
+
+    <span class="comment">// SET a key</span>
+    err := rdb.<span class="func">Set</span>(ctx, <span class="string">"greeting"</span>, <span class="string">"hello from localgcp"</span>, 0).<span class="func">Err</span>()
     <span class="keyword">if</span> err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
 
-    <span class="comment">// List entries with a filter (e.g. only errors)</span>
-    it := client.<span class="func">ListLogEntries</span>(ctx, &amp;loggingpb.ListLogEntriesRequest{
-        ResourceNames: []<span class="type">string</span>{project},
-        Filter:        <span class="string">"severity &gt;= ERROR"</span>,
-    })
-
-    <span class="keyword">for</span> {
-        entry, err := it.<span class="func">Next</span>()
-        <span class="keyword">if</span> err != <span class="keyword">nil</span> {
-            <span class="keyword">break</span>
-        }
-        fmt.<span class="func">Printf</span>(<span class="string">"[%s] %s\n"</span>, entry.Severity, entry.<span class="func">GetTextPayload</span>())
+    <span class="comment">// GET the key</span>
+    val, err := rdb.<span class="func">Get</span>(ctx, <span class="string">"greeting"</span>).<span class="func">Result</span>()
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
     }
+    fmt.<span class="func">Println</span>(val) <span class="comment">// "hello from localgcp"</span>
 }</pre>
 
-      <h2>Features</h2>
+      <h2>Python example</h2>
+
+      <p>Connect with the <code>redis</code> package:</p>
+
+<pre class="code-block"><span class="keyword">import</span> redis
+
+r = redis.<span class="func">Redis</span>(host=<span class="string">"localhost"</span>, port=<span class="type">6379</span>)
+
+r.<span class="func">set</span>(<span class="string">"greeting"</span>, <span class="string">"hello from localgcp"</span>)
+print(r.<span class="func">get</span>(<span class="string">"greeting"</span>))  <span class="comment"># b"hello from localgcp"</span></pre>
+
+      <h2>How it works</h2>
 
       <ul>
-        <li><strong>Write log entries</strong> -- write entries with severity levels, labels, and monitored resources</li>
-        <li><strong>List entries with filtering</strong> -- filter by severity, text payload, and log name</li>
-        <li><strong>List log names</strong> -- list distinct log names within a project</li>
-        <li><strong>Delete logs</strong> -- delete all entries for a given log name</li>
-        <li><strong>Bounded in-memory store</strong> -- retains up to 10,000 entries; oldest are evicted automatically</li>
+        <li><strong>Lazy TCP proxy</strong> -- localgcp listens on port 6379 and starts the Redis container on the first incoming connection</li>
+        <li><strong>redis:7-alpine image</strong> -- lightweight Redis 7 image pulled automatically by Docker</li>
+        <li><strong>No auth</strong> -- the container runs without a password, matching the zero-config local development experience</li>
       </ul>
 
       <h2>Not yet supported</h2>
 
       <ul>
-        <li>Structured payload queries</li>
-        <li>Log sinks</li>
-        <li>Log-based metrics</li>
-        <li>Streaming tail (<code>TailLogEntries</code>)</li>
+        <li>Data persistence across restarts</li>
+        <li>AUTH / password authentication</li>
+        <li>Redis Cluster mode</li>
       </ul>
 
     </main>

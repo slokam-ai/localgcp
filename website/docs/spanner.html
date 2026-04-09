@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloud Logging - localgcp docs</title>
-  <meta name="description" content="Emulate Google Cloud Logging locally. Write, query, and filter log entries.">
+  <title>Cloud Spanner - localgcp docs</title>
+  <meta name="description" content="Use Cloud Spanner locally via localgcp's Docker orchestrator. Lazy startup, zero config.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -150,125 +150,180 @@
       <a href="/docs/secret-manager.html" class="sidebar-link">Secret Manager</a>
       <a href="/docs/cloud-tasks.html" class="sidebar-link">Cloud Tasks</a>
       <a href="/docs/cloud-kms.html" class="sidebar-link">Cloud KMS</a>
-      <a href="/docs/cloud-logging.html" class="sidebar-link active">Cloud Logging</a>
+      <a href="/docs/cloud-logging.html" class="sidebar-link">Cloud Logging</a>
       <a href="/docs/cloud-run.html" class="sidebar-link">Cloud Run</a>
-      <div class="sidebar-section" style="margin-top:1rem"><div class="sidebar-label">Orchestrated</div></div>
-      <a href="/docs/spanner.html" class="sidebar-link">Spanner</a>
+      <a href="/docs/spanner.html" class="sidebar-link active">Spanner</a>
       <a href="/docs/bigtable.html" class="sidebar-link">Bigtable</a>
       <a href="/docs/cloud-sql.html" class="sidebar-link">Cloud SQL</a>
       <a href="/docs/memorystore.html" class="sidebar-link">Memorystore</a>
     </aside>
 
     <main class="content">
-      <h1>Cloud Logging</h1>
-      <div class="subtitle">gRPC &middot; port 8092</div>
-
-      <h2>Configuration</h2>
+      <h1>Cloud Spanner</h1>
+      <div class="subtitle">gRPC &middot; port 9010 &middot; orchestrated</div>
 
       <div class="callout">
-        <strong>No env var.</strong> Cloud Logging has no official <code>*_EMULATOR_HOST</code> environment variable. You must configure the endpoint manually in your client code.
+        <strong>Orchestrated service.</strong> Spanner runs as a Docker container managed by localgcp. Requires Docker (Docker Desktop, OrbStack, or Colima). The container starts lazily on first connection, not at startup.
       </div>
+
+      <h2>Quick start</h2>
+
+<pre class="code-block"><span class="prompt">$</span> localgcp up --services=spanner</pre>
+
+      <p>The first time your code connects to port 9010, localgcp pulls the official Google Spanner emulator image and starts it. Subsequent startups reuse the cached image (~3s).</p>
 
       <h2>Go SDK example</h2>
 
-      <p>Write log entries with severity levels and list them back with a filter:</p>
+      <p>Connect to the emulator, create an instance, create a database, and run a query:</p>
+
 <pre class="code-block"><span class="keyword">package</span> main
 
 <span class="keyword">import</span> (
     <span class="string">"context"</span>
     <span class="string">"fmt"</span>
     <span class="string">"log"</span>
+    <span class="string">"os"</span>
 
-    logging <span class="string">"cloud.google.com/go/logging/apiv2"</span>
-    loggingpb <span class="string">"cloud.google.com/go/logging/apiv2/loggingpb"</span>
-    <span class="string">"google.golang.org/api/option"</span>
-    <span class="string">"google.golang.org/grpc"</span>
-    <span class="string">"google.golang.org/grpc/credentials/insecure"</span>
-    ltype <span class="string">"google.golang.org/genproto/googleapis/logging/type"</span>
-    monitoredres <span class="string">"google.golang.org/genproto/googleapis/api/monitoredres"</span>
+    spanner <span class="string">"cloud.google.com/go/spanner"</span>
+    database <span class="string">"cloud.google.com/go/spanner/admin/database/apiv1"</span>
+    databasepb <span class="string">"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"</span>
+    instance <span class="string">"cloud.google.com/go/spanner/admin/instance/apiv1"</span>
+    instancepb <span class="string">"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"</span>
+    <span class="string">"google.golang.org/api/iterator"</span>
 )
 
 <span class="keyword">func</span> <span class="func">main</span>() {
-    ctx := context.<span class="func">Background</span>()
+    <span class="comment">// Point the SDK at the localgcp emulator</span>
+    os.<span class="func">Setenv</span>(<span class="string">"SPANNER_EMULATOR_HOST"</span>, <span class="string">"localhost:9010"</span>)
 
-    <span class="comment">// Connect to localgcp (no TLS, no auth)</span>
-    client, err := logging.<span class="func">NewClient</span>(ctx,
-        option.<span class="func">WithEndpoint</span>(<span class="string">"localhost:8092"</span>),
-        option.<span class="func">WithoutAuthentication</span>(),
-        option.<span class="func">WithGRPCDialOption</span>(grpc.<span class="func">WithTransportCredentials</span>(
-            insecure.<span class="func">NewCredentials</span>(),
-        )),
-    )
+    ctx := context.<span class="func">Background</span>()
+    project := <span class="string">"my-project"</span>
+
+    <span class="comment">// Create an instance</span>
+    instanceAdmin, err := instance.<span class="func">NewInstanceAdminClient</span>(ctx)
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+    <span class="keyword">defer</span> instanceAdmin.<span class="func">Close</span>()
+
+    op, err := instanceAdmin.<span class="func">CreateInstance</span>(ctx, &amp;instancepb.CreateInstanceRequest{
+        Parent:     fmt.<span class="func">Sprintf</span>(<span class="string">"projects/%s"</span>, project),
+        InstanceId: <span class="string">"my-instance"</span>,
+        Instance: &amp;instancepb.Instance{
+            DisplayName: <span class="string">"My Instance"</span>,
+            Config:      fmt.<span class="func">Sprintf</span>(<span class="string">"projects/%s/instanceConfigs/emulator-config"</span>, project),
+            NodeCount:   1,
+        },
+    })
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+    <span class="keyword">if</span> _, err = op.<span class="func">Wait</span>(ctx); err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+
+    <span class="comment">// Create a database with a table</span>
+    databaseAdmin, err := database.<span class="func">NewDatabaseAdminClient</span>(ctx)
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+    <span class="keyword">defer</span> databaseAdmin.<span class="func">Close</span>()
+
+    dbOp, err := databaseAdmin.<span class="func">CreateDatabase</span>(ctx, &amp;databasepb.CreateDatabaseRequest{
+        Parent:          fmt.<span class="func">Sprintf</span>(<span class="string">"projects/%s/instances/my-instance"</span>, project),
+        CreateStatement: <span class="string">"CREATE DATABASE `my-db`"</span>,
+        ExtraStatements: []<span class="keyword">string</span>{
+            <span class="string">`CREATE TABLE Users (
+    UserId   INT64 NOT NULL,
+    Name     STRING(1024),
+    Email    STRING(1024),
+) PRIMARY KEY (UserId)`</span>,
+        },
+    })
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+    <span class="keyword">if</span> _, err = dbOp.<span class="func">Wait</span>(ctx); err != <span class="keyword">nil</span> {
+        log.<span class="func">Fatal</span>(err)
+    }
+
+    <span class="comment">// Insert a row and query it</span>
+    db := fmt.<span class="func">Sprintf</span>(<span class="string">"projects/%s/instances/my-instance/databases/my-db"</span>, project)
+    client, err := spanner.<span class="func">NewClient</span>(ctx, db)
     <span class="keyword">if</span> err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
     <span class="keyword">defer</span> client.<span class="func">Close</span>()
 
-    project := <span class="string">"projects/my-project"</span>
-
-    <span class="comment">// Write log entries with severity</span>
-    err = client.<span class="func">WriteLogEntries</span>(ctx, &amp;loggingpb.WriteLogEntriesRequest{
-        LogName:  project + <span class="string">"/logs/my-service"</span>,
-        Resource: &amp;monitoredres.MonitoredResource{
-            Type: <span class="string">"global"</span>,
-            Labels: <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>{
-                <span class="string">"project_id"</span>: <span class="string">"my-project"</span>,
-            },
-        },
-        Entries: []*loggingpb.LogEntry{
-            {
-                Severity: ltype.LogSeverity_INFO,
-                Payload:  &amp;loggingpb.LogEntry_TextPayload{
-                    TextPayload: <span class="string">"Server started on port 8080"</span>,
-                },
-                Labels: <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>{
-                    <span class="string">"env"</span>: <span class="string">"dev"</span>,
-                },
-            },
-            {
-                Severity: ltype.LogSeverity_ERROR,
-                Payload:  &amp;loggingpb.LogEntry_TextPayload{
-                    TextPayload: <span class="string">"Connection refused: database unreachable"</span>,
-                },
-            },
-        },
+    _, err = client.<span class="func">Apply</span>(ctx, []*spanner.Mutation{
+        spanner.<span class="func">InsertOrUpdate</span>(<span class="string">"Users"</span>,
+            []<span class="keyword">string</span>{<span class="string">"UserId"</span>, <span class="string">"Name"</span>, <span class="string">"Email"</span>},
+            []<span class="keyword">interface</span>{}{1, <span class="string">"Alice"</span>, <span class="string">"alice@example.com"</span>},
+        ),
     })
     <span class="keyword">if</span> err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
 
-    <span class="comment">// List entries with a filter (e.g. only errors)</span>
-    it := client.<span class="func">ListLogEntries</span>(ctx, &amp;loggingpb.ListLogEntriesRequest{
-        ResourceNames: []<span class="type">string</span>{project},
-        Filter:        <span class="string">"severity &gt;= ERROR"</span>,
+    iter := client.<span class="func">Single</span>().<span class="func">Query</span>(ctx, spanner.Statement{
+        SQL: <span class="string">"SELECT UserId, Name, Email FROM Users"</span>,
     })
+    <span class="keyword">defer</span> iter.<span class="func">Stop</span>()
 
     <span class="keyword">for</span> {
-        entry, err := it.<span class="func">Next</span>()
-        <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        row, err := iter.<span class="func">Next</span>()
+        <span class="keyword">if</span> err == iterator.Done {
             <span class="keyword">break</span>
         }
-        fmt.<span class="func">Printf</span>(<span class="string">"[%s] %s\n"</span>, entry.Severity, entry.<span class="func">GetTextPayload</span>())
+        <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+            log.<span class="func">Fatal</span>(err)
+        }
+        <span class="keyword">var</span> userId <span class="type">int64</span>
+        <span class="keyword">var</span> name, email <span class="type">string</span>
+        <span class="keyword">if</span> err := row.<span class="func">Columns</span>(&amp;userId, &amp;name, &amp;email); err != <span class="keyword">nil</span> {
+            log.<span class="func">Fatal</span>(err)
+        }
+        fmt.<span class="func">Printf</span>(<span class="string">"User: %d %s %s\n"</span>, userId, name, email)
     }
 }</pre>
 
-      <h2>Features</h2>
+      <h2>Environment variable</h2>
 
-      <ul>
-        <li><strong>Write log entries</strong> -- write entries with severity levels, labels, and monitored resources</li>
-        <li><strong>List entries with filtering</strong> -- filter by severity, text payload, and log name</li>
-        <li><strong>List log names</strong> -- list distinct log names within a project</li>
-        <li><strong>Delete logs</strong> -- delete all entries for a given log name</li>
-        <li><strong>Bounded in-memory store</strong> -- retains up to 10,000 entries; oldest are evicted automatically</li>
-      </ul>
+      <p>The Spanner client libraries check <code>SPANNER_EMULATOR_HOST</code> automatically. Set it before running your code:</p>
+
+<pre class="code-block"><span class="prompt">$</span> <span class="keyword">export</span> SPANNER_EMULATOR_HOST=localhost:9010</pre>
+
+      <p>Or let localgcp set all environment variables at once:</p>
+
+<pre class="code-block"><span class="prompt">$</span> <span class="keyword">eval</span> $(localgcp env)</pre>
+
+      <h2>How it works</h2>
+
+      <p>localgcp uses a <strong>lazy TCP proxy</strong> to manage the Spanner emulator container:</p>
+
+      <ol>
+        <li><strong>Port binds instantly</strong> -- localgcp listens on port 9010 as soon as it starts, so your code never gets "connection refused."</li>
+        <li><strong>Container starts on first request</strong> -- the first TCP connection triggers <code>docker run</code> with the official Spanner emulator image. localgcp waits for the container to become healthy before forwarding.</li>
+        <li><strong><code>io.Copy</code> proxies all traffic</strong> -- once the container is up, localgcp splices the connection through to the emulator with zero overhead for subsequent requests.</li>
+        <li><strong>Ctrl+C stops the container</strong> -- when localgcp shuts down, it stops and removes the Docker container automatically.</li>
+      </ol>
+
+      <h2>Pre-fetching images</h2>
+
+      <p>The first cold start pulls the emulator image, which can take 30-60s on a slow connection. To avoid that delay, pre-fetch the image:</p>
+
+<pre class="code-block"><span class="comment"># Coming soon</span>
+<span class="prompt">$</span> localgcp pull</pre>
+
+      <p>Or pull manually:</p>
+
+<pre class="code-block"><span class="prompt">$</span> docker pull gcr.io/cloud-spanner-emulator/emulator:1.5.23</pre>
 
       <h2>Not yet supported</h2>
 
       <ul>
-        <li>Structured payload queries</li>
-        <li>Log sinks</li>
-        <li>Log-based metrics</li>
-        <li>Streaming tail (<code>TailLogEntries</code>)</li>
+        <li>Data persistence across restarts</li>
+        <li>Spanner REST admin API (<code>:9020</code>)</li>
       </ul>
 
     </main>

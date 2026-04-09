@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>localgcp - The unified GCP emulator</title>
-  <meta name="description" content="One binary, nine services, zero cloud bills. Run Vertex AI against local models via Ollama. Emulate Cloud Storage, Pub/Sub, Firestore, and more.">
+  <meta name="description" content="One binary, thirteen services, zero cloud bills. Run Vertex AI against local models via Ollama. Emulate Cloud Storage, Pub/Sub, Firestore, and more.">
   <meta property="og:title" content="localgcp - Run GCP locally. Even Vertex AI.">
-  <meta property="og:description" content="One binary, nine services, zero cloud bills. Proxy Vertex AI to local LLMs via Ollama.">
+  <meta property="og:description" content="One binary, thirteen services, zero cloud bills. Proxy Vertex AI to local LLMs via Ollama.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://localgcp.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -303,7 +303,7 @@
         <h1>localgcp</h1>
         <div class="hero-tagline">{ the unified GCP emulator }</div>
         <p class="hero-desc">
-          One binary, nine services, zero cloud bills.
+          One binary, thirteen services, zero cloud bills.
           Develop against GCP locally, including Vertex AI with real local inference.
         </p>
         <div class="hero-highlight">
@@ -336,7 +336,7 @@
 
       <section>
         <div class="section-label">What you get</div>
-        <h2>Nine services. One process.</h2>
+        <h2>Thirteen services. One command.</h2>
         <p>
           Your GCP client libraries already support emulator host env vars.
           Point them at localhost and your existing code works with zero changes.
@@ -417,6 +417,42 @@
               Auto-generated URIs. No polling required.
             </p>
           </div>
+          <div class="service">
+            <span class="service-badge badge-ai">Docker</span>
+            <div class="service-name">Spanner</div>
+            <div class="service-proto">gRPC &middot; :9010</div>
+            <p class="service-desc">
+              Official Google emulator via Docker.
+              Lazy start on first connection. Full API.
+            </p>
+          </div>
+          <div class="service">
+            <span class="service-badge badge-ai">Docker</span>
+            <div class="service-name">Bigtable</div>
+            <div class="service-proto">gRPC &middot; :9094</div>
+            <p class="service-desc">
+              Official Google emulator via Docker.
+              Lazy start on first connection. Full API.
+            </p>
+          </div>
+          <div class="service">
+            <span class="service-badge badge-ai">Docker</span>
+            <div class="service-name">Cloud SQL</div>
+            <div class="service-proto">TCP &middot; :5432</div>
+            <p class="service-desc">
+              PostgreSQL 16 via Docker. Standard
+              connection. Works with any Postgres client.
+            </p>
+          </div>
+          <div class="service">
+            <span class="service-badge badge-ai">Docker</span>
+            <div class="service-name">Memorystore</div>
+            <div class="service-proto">TCP &middot; :6379</div>
+            <p class="service-desc">
+              Redis 7 via Docker. Standard connection.
+              Works with any Redis client.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -440,7 +476,7 @@
             <div class="step-num">02</div>
             <div>
               <h3>Start</h3>
-              <p>All nine services in the foreground. For Vertex AI with local models, start Ollama first.</p>
+              <p>All native services in the foreground. For Vertex AI with local models, start Ollama first.</p>
               <code><span class="prompt">$</span> ollama pull gemma3          <span class="comment"># optional: for Vertex AI</span>
 <span class="prompt">$</span> localgcp up --vertex-model-map="gemini-2.5-flash=gemma3"</code>
             </div>
@@ -505,7 +541,7 @@
 
       <section class="cta">
         <h2>Start building locally</h2>
-        <p>Nine services. 160+ tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
+        <p>Thirteen services. 170+ tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
         <a href="https://github.com/slokam-ai/localgcp" class="cta-btn">View on GitHub</a>
         <span class="cta-install">
           or: <a href="/docs/">read the docs</a> &middot;
