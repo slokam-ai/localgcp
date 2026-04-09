@@ -29,6 +29,12 @@ type Config struct {
 	VertexModelMap    string
 	VertexBackend     string // "ollama" (default), "openai", "anthropic", "stub"
 	VertexAPIKey      string // API key for OpenAI/Anthropic backends
+	Services          string // comma-separated orchestrated services (e.g. "spanner,bigtable")
+	NoDocker          bool   // skip all orchestrated services
+	PortSpanner       int
+	PortBigtable      int
+	PortCloudSQL      int
+	PortMemorystore   int
 }
 
 // DefaultConfig returns the default server configuration.
@@ -43,6 +49,10 @@ func DefaultConfig() Config {
 		PortKMS:           8091,
 		PortLogging:       8092,
 		PortCloudRun:      8093,
+		PortSpanner:       9010,
+		PortBigtable:      9094,
+		PortCloudSQL:      5432,
+		PortMemorystore:   6379,
 		OllamaHost:        "http://localhost:11434",
 	}
 }
