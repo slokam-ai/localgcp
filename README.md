@@ -1,6 +1,6 @@
 # localgcp
 
-The first unified GCP emulator. One binary, six services, zero cloud bills.
+The first unified GCP emulator. One binary, nine services, zero cloud bills.
 
 **Now with Vertex AI.** Run your `google.golang.org/genai` code against local LLMs via Ollama. Zero code changes, real inference, no API keys.
 
@@ -50,7 +50,7 @@ Without Ollama running, localgcp returns deterministic stub responses, perfect f
 
 ## What it does
 
-localgcp emulates core GCP services locally so you can develop and test without a cloud project, without credentials, and without a bill.
+localgcp emulates nine GCP services locally so you can develop and test without a cloud project, without credentials, and without a bill.
 
 | Service | Protocol | Port | Env var |
 |---------|----------|------|---------|
@@ -60,6 +60,9 @@ localgcp emulates core GCP services locally so you can develop and test without 
 | Firestore | gRPC | 8088 | `FIRESTORE_EMULATOR_HOST` |
 | Cloud Tasks | gRPC | 8089 | (manual endpoint config) |
 | Vertex AI | REST | 8090 | (manual endpoint config) |
+| Cloud KMS | gRPC | 8091 | (manual endpoint config) |
+| Cloud Logging | gRPC | 8092 | (manual endpoint config) |
+| Cloud Run | gRPC | 8093 | (manual endpoint config) |
 
 ## Quick start
 
@@ -69,7 +72,7 @@ localgcp emulates core GCP services locally so you can develop and test without 
 localgcp up
 ```
 
-All six services start in the foreground. Data lives in memory and vanishes when you stop. Press Ctrl+C to stop.
+All nine services start in the foreground. Data lives in memory and vanishes when you stop. Press Ctrl+C to stop.
 
 For persistent data across restarts:
 
@@ -171,6 +174,24 @@ Your GCP client libraries work against localgcp with zero code changes (except S
 - Model alias registry: map Vertex model names to local model names (e.g. `gemini-2.5-flash` -> `llama3.2`)
 - Works with the official `google.golang.org/genai` SDK via `HTTPOptions.BaseURL`
 
+### Cloud KMS
+- KeyRing and CryptoKey CRUD
+- Symmetric encrypt/decrypt (ENCRYPT_DECRYPT purpose)
+- Asymmetric sign and public key retrieval (EC P256, RSA 2048)
+- HMAC sign and verify (MAC purpose)
+- CryptoKeyVersion management (create, list, destroy)
+
+### Cloud Logging
+- Write log entries with severity, labels, and monitored resources
+- List log entries with filtering (severity, text payload, log name)
+- List distinct log names
+- Delete logs by name
+
+### Cloud Run
+- Service CRUD (create, get, list, update, delete)
+- Immediate operation completion (no polling required)
+- Auto-generated service URIs
+
 ## CLI reference
 
 ```
@@ -190,6 +211,9 @@ localgcp --version         Print version
 | `--port-firestore` | 8088 | Firestore port |
 | `--port-cloudtasks` | 8089 | Cloud Tasks port |
 | `--port-vertexai` | 8090 | Vertex AI port |
+| `--port-kms` | 8091 | Cloud KMS port |
+| `--port-logging` | 8092 | Cloud Logging port |
+| `--port-cloudrun` | 8093 | Cloud Run port |
 | `--ollama-host` | `http://localhost:11434` | Ollama API host for Vertex AI |
 | `--vertex-model-map` | (defaults) | Model aliases (e.g. `gemini-2.5-flash=llama3.2`) |
 | `--vertex-backend` | `ollama` | Backend provider: `ollama`, `openai`, `anthropic`, `stub` |
@@ -198,7 +222,7 @@ localgcp --version         Print version
 
 ## How it works
 
-localgcp is a single Go binary with no runtime dependencies. Each GCP service is implemented from scratch in Go (no wrapping of Google's official Java-based emulators). Data is stored in memory by default, with optional JSON-file persistence via `--data-dir`.
+localgcp is a single Go binary with no runtime dependencies. All nine GCP services are implemented from scratch in Go (no wrapping of Google's official Java-based emulators). Data is stored in memory by default, with optional JSON-file persistence via `--data-dir`.
 
 GCP client libraries already support `*_EMULATOR_HOST` environment variables. When these are set, the libraries connect to localhost instead of Google Cloud. localgcp uses this mechanism for zero-friction SDK compatibility.
 
@@ -210,6 +234,9 @@ GCP client libraries already support `*_EMULATOR_HOST` environment variables. Wh
 - Cloud Tasks: App Engine task targets, OIDC/OAuth authentication
 - Vertex AI: multimodal (images/audio)
 - Secret Manager: IAM bindings, replication policies, rotation
+- Cloud KMS: key import, key rotation schedules, raw encrypt/decrypt, asymmetric decrypt
+- Cloud Logging: structured payload queries, log sinks, log-based metrics, streaming tail
+- Cloud Run: container execution, revisions, traffic splitting, domain mapping
 - IAM/auth enforcement (all requests are accepted)
 
 See [ROADMAP.md](ROADMAP.md) for what's coming next.

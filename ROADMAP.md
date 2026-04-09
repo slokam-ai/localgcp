@@ -41,9 +41,9 @@ Fill the gaps that matter most for real-world adoption.
 
 ## Phase 3 — Security and observability
 
-- [ ] Cloud KMS (sign, verify, encrypt/decrypt with in-memory keys)
-- [ ] Cloud Logging (log ingestion and query)
-- [ ] Cloud Run (container execution)
+- [x] Cloud KMS (encrypt/decrypt, sign/verify, MAC, key management)
+- [x] Cloud Logging (log ingestion, query, filtering, delete)
+- [x] Cloud Run (service CRUD with immediate operations)
 
 ## Phase 3b — IAM (deferred, needs design)
 

@@ -7,13 +7,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/slokam-ai/localgcp/internal/auth"
+	"github.com/slokam-ai/localgcp/internal/cloudrun"
 	"github.com/slokam-ai/localgcp/internal/cloudtasks"
 	"github.com/slokam-ai/localgcp/internal/firestore"
-	"github.com/slokam-ai/localgcp/internal/vertexai"
 	"github.com/slokam-ai/localgcp/internal/gcs"
+	"github.com/slokam-ai/localgcp/internal/kms"
+	"github.com/slokam-ai/localgcp/internal/logging"
 	"github.com/slokam-ai/localgcp/internal/pubsub"
 	"github.com/slokam-ai/localgcp/internal/secretmanager"
 	"github.com/slokam-ai/localgcp/internal/server"
+	"github.com/slokam-ai/localgcp/internal/vertexai"
 )
 
 var version = "dev"
@@ -21,7 +24,7 @@ var version = "dev"
 func main() {
 	root := &cobra.Command{
 		Use:     "localgcp",
-		Short:   "The first unified GCP emulator. One binary, four services, zero cloud bills.",
+		Short:   "The first unified GCP emulator. One binary, nine services, zero cloud bills.",
 		Version: version,
 	}
 
@@ -54,6 +57,9 @@ func upCmd() *cobra.Command {
 			srv.Register(firestore.New(cfg.DataDir, cfg.Quiet), cfg.PortFirestore)
 			srv.Register(cloudtasks.New(cfg.DataDir, cfg.Quiet), cfg.PortCloudTasks)
 			srv.Register(vertexai.New(cfg.DataDir, cfg.Quiet, cfg.OllamaHost, cfg.VertexModelMap, cfg.VertexBackend, cfg.VertexAPIKey), cfg.PortVertexAI)
+			srv.Register(kms.New(cfg.DataDir, cfg.Quiet), cfg.PortKMS)
+			srv.Register(logging.New(cfg.DataDir, cfg.Quiet), cfg.PortLogging)
+			srv.Register(cloudrun.New(cfg.DataDir, cfg.Quiet), cfg.PortCloudRun)
 
 			return srv.Run()
 		},
@@ -66,6 +72,9 @@ func upCmd() *cobra.Command {
 	cmd.Flags().IntVar(&cfg.PortFirestore, "port-firestore", cfg.PortFirestore, "Port for Firestore")
 	cmd.Flags().IntVar(&cfg.PortCloudTasks, "port-cloudtasks", cfg.PortCloudTasks, "Port for Cloud Tasks")
 	cmd.Flags().IntVar(&cfg.PortVertexAI, "port-vertexai", cfg.PortVertexAI, "Port for Vertex AI")
+	cmd.Flags().IntVar(&cfg.PortKMS, "port-kms", cfg.PortKMS, "Port for Cloud KMS")
+	cmd.Flags().IntVar(&cfg.PortLogging, "port-logging", cfg.PortLogging, "Port for Cloud Logging")
+	cmd.Flags().IntVar(&cfg.PortCloudRun, "port-cloudrun", cfg.PortCloudRun, "Port for Cloud Run")
 	cmd.Flags().StringVar(&cfg.OllamaHost, "ollama-host", cfg.OllamaHost, "Ollama API host for Vertex AI backend")
 	cmd.Flags().StringVar(&cfg.VertexModelMap, "vertex-model-map", "", "Model alias mapping (e.g. gemini-2.5-flash=llama3.2)")
 	cmd.Flags().StringVar(&cfg.VertexBackend, "vertex-backend", "", "Vertex AI backend: ollama (default), openai, anthropic, stub")
@@ -76,7 +85,7 @@ func upCmd() *cobra.Command {
 }
 
 func envCmd() *cobra.Command {
-	var portGCS, portPubSub, portFirestore, portSecretManager, portCloudTasks, portVertexAI int
+	var portGCS, portPubSub, portFirestore, portSecretManager, portCloudTasks, portVertexAI, portKMS, portLogging, portCloudRun int
 
 	cmd := &cobra.Command{
 		Use:   "env",
@@ -116,6 +125,27 @@ func envCmd() *cobra.Command {
 			fmt.Println("#     Backend: genai.BackendVertexAI,")
 			fmt.Printf("#     HTTPOptions: genai.HTTPOptions{BaseURL: \"http://localhost:%d\"},\n", portVertexAI)
 			fmt.Println("#   })")
+			fmt.Println("#")
+			fmt.Println("# Cloud KMS:")
+			fmt.Println("#   client, _ := kms.NewKeyManagementClient(ctx,")
+			fmt.Printf("#     option.WithEndpoint(\"localhost:%d\"),\n", portKMS)
+			fmt.Println("#     option.WithoutAuthentication(),")
+			fmt.Println("#     option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),")
+			fmt.Println("#   )")
+			fmt.Println("#")
+			fmt.Println("# Cloud Logging:")
+			fmt.Println("#   client, _ := logadmin.NewClient(ctx, \"my-project\",")
+			fmt.Printf("#     option.WithEndpoint(\"localhost:%d\"),\n", portLogging)
+			fmt.Println("#     option.WithoutAuthentication(),")
+			fmt.Println("#     option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),")
+			fmt.Println("#   )")
+			fmt.Println("#")
+			fmt.Println("# Cloud Run:")
+			fmt.Println("#   client, _ := run.NewServicesClient(ctx,")
+			fmt.Printf("#     option.WithEndpoint(\"localhost:%d\"),\n", portCloudRun)
+			fmt.Println("#     option.WithoutAuthentication(),")
+			fmt.Println("#     option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),")
+			fmt.Println("#   )")
 
 			return nil
 		},
@@ -128,6 +158,9 @@ func envCmd() *cobra.Command {
 	cmd.Flags().IntVar(&portSecretManager, "port-secretmanager", cfg.PortSecretManager, "Port for Secret Manager")
 	cmd.Flags().IntVar(&portCloudTasks, "port-cloudtasks", cfg.PortCloudTasks, "Port for Cloud Tasks")
 	cmd.Flags().IntVar(&portVertexAI, "port-vertexai", cfg.PortVertexAI, "Port for Vertex AI")
+	cmd.Flags().IntVar(&portKMS, "port-kms", cfg.PortKMS, "Port for Cloud KMS")
+	cmd.Flags().IntVar(&portLogging, "port-logging", cfg.PortLogging, "Port for Cloud Logging")
+	cmd.Flags().IntVar(&portCloudRun, "port-cloudrun", cfg.PortCloudRun, "Port for Cloud Run")
 
 	return cmd
 }
