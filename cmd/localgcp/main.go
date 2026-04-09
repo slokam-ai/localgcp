@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/slokam-ai/localgcp/internal/gcs"
 	"github.com/slokam-ai/localgcp/internal/kms"
 	"github.com/slokam-ai/localgcp/internal/logging"
+	"github.com/slokam-ai/localgcp/internal/orchestrator"
 	"github.com/slokam-ai/localgcp/internal/pubsub"
 	"github.com/slokam-ai/localgcp/internal/secretmanager"
 	"github.com/slokam-ai/localgcp/internal/server"
@@ -61,6 +64,37 @@ func upCmd() *cobra.Command {
 			srv.Register(logging.New(cfg.DataDir, cfg.Quiet), cfg.PortLogging)
 			srv.Register(cloudrun.New(cfg.DataDir, cfg.Quiet), cfg.PortCloudRun)
 
+			// Register orchestrated Docker services (opt-in via --services).
+			if cfg.Services != "" && !cfg.NoDocker {
+				runtime := orchestrator.NewDockerRuntime(log.New(os.Stderr, "[orchestrator] ", log.LstdFlags))
+				if !runtime.Available() {
+					fmt.Fprintln(os.Stderr, "Warning: Docker not available; skipping orchestrated services")
+				} else {
+					// Clean up orphaned containers from crashed sessions.
+					runtime.CleanupOrphans(cmd.Context(), "localgcp-")
+
+					requested := strings.Split(cfg.Services, ",")
+					portMap := map[string]int{
+						"spanner":     cfg.PortSpanner,
+						"bigtable":    cfg.PortBigtable,
+						"cloudsql":    cfg.PortCloudSQL,
+						"memorystore": cfg.PortMemorystore,
+					}
+					for _, svcName := range requested {
+						svcName = strings.TrimSpace(svcName)
+						ecfg, ok := orchestrator.ServiceRegistry[svcName]
+						if !ok {
+							return fmt.Errorf("unknown orchestrated service: %s (available: spanner, bigtable, cloudsql, memorystore)", svcName)
+						}
+						port, ok := portMap[svcName]
+						if !ok {
+							return fmt.Errorf("no port configured for %s", svcName)
+						}
+						srv.Register(orchestrator.NewLazyService(ecfg.Name, ecfg, runtime), port)
+					}
+				}
+			}
+
 			return srv.Run()
 		},
 	}
@@ -79,6 +113,12 @@ func upCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.VertexModelMap, "vertex-model-map", "", "Model alias mapping (e.g. gemini-2.5-flash=llama3.2)")
 	cmd.Flags().StringVar(&cfg.VertexBackend, "vertex-backend", "", "Vertex AI backend: ollama (default), openai, anthropic, stub")
 	cmd.Flags().StringVar(&cfg.VertexAPIKey, "vertex-api-key", "", "API key for OpenAI/Anthropic Vertex AI backends")
+	cmd.Flags().StringVar(&cfg.Services, "services", "", "Docker-orchestrated services: spanner,bigtable,cloudsql,memorystore")
+	cmd.Flags().BoolVar(&cfg.NoDocker, "no-docker", false, "Skip all Docker-orchestrated services")
+	cmd.Flags().IntVar(&cfg.PortSpanner, "port-spanner", cfg.PortSpanner, "Port for Spanner emulator")
+	cmd.Flags().IntVar(&cfg.PortBigtable, "port-bigtable", cfg.PortBigtable, "Port for Bigtable emulator")
+	cmd.Flags().IntVar(&cfg.PortCloudSQL, "port-cloudsql", cfg.PortCloudSQL, "Port for Cloud SQL (Postgres)")
+	cmd.Flags().IntVar(&cfg.PortMemorystore, "port-memorystore", cfg.PortMemorystore, "Port for Memorystore (Redis)")
 	cmd.Flags().BoolVarP(&cfg.Quiet, "quiet", "q", false, "Suppress request logging (for CI)")
 
 	return cmd

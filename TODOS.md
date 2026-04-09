@@ -22,3 +22,17 @@
 ### ~~Firestore Listen: resume tokens~~ (DONE)
 - Implemented with global sequence counter, bounded ring buffer (1024 entries), and 8-byte resume tokens.
 - Clients reconnecting with valid token get incremental changes; invalid/expired tokens fall back to full snapshot.
+
+## Phase 4 — Docker Orchestrator
+
+### `localgcp pull` command
+- **What:** `localgcp pull [--services=spanner,bigtable]` pre-fetches Docker images so first-request latency is 3s (container start) not 30-60s (pull + start).
+- **Why:** Major UX improvement. Eliminates cold-pull surprise, enables offline setup.
+- **Context:** ~30 lines using ContainerRuntime.Pull(). Design doc lists as next step after Spanner MVP.
+- **Depends on:** ContainerRuntime interface (v0.5.0 orchestrator package).
+
+### Data persistence for orchestrated containers
+- **What:** Map `--data-dir` to Docker volume mounts so Spanner/Bigtable data survives container restart.
+- **Why:** Native services already support `--data-dir`. Orchestrated services should match for consistency.
+- **Context:** Each emulator has different persistence flags. Spanner has limited persistence support. v0.5.0 uses ephemeral containers.
+- **Depends on:** Orchestrator MVP (v0.5.0).
