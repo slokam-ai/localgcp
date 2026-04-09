@@ -67,7 +67,7 @@ Containers start on first connection, not at startup. Opt-in via `--services` fl
 ## Distribution milestones
 
 - [x] GitHub Releases with pre-built binaries (goreleaser)
-- [x] Homebrew cask (`brew install slokam-ai/tap/localgcp`)
+- [x] Homebrew formula (`brew install slokam-ai/tap/localgcp`)
 - [x] Docker multi-arch image (`ghcr.io/slokam-ai/localgcp`)
 - [x] GitHub Actions CI (test on push) + release (on tag)
 - [x] Landing page at localgcp.com
@@ -80,3 +80,4 @@ Containers start on first connection, not at startup. Opt-in via `--services` fl
 - Multi-language SDK integration tests (Python, Java, Node.js)
 - Cloud Functions v2 (container-based executor)
 - Daemon mode (`localgcp up -d`)
+- BigQuery emulator (orchestrated via goccy/bigquery-emulator, or native with DuckDB)
