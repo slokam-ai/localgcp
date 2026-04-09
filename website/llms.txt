@@ -1,0 +1,57 @@
+# localgcp
+
+> The unified GCP emulator. One binary, thirteen services, zero cloud bills.
+
+localgcp is an open source Go binary that emulates Google Cloud Platform services locally for development and testing. It replaces fragmented emulator setups with a single command.
+
+## Services
+
+Nine services are implemented natively in Go (zero dependencies):
+- Cloud Storage (REST, port 4443)
+- Pub/Sub (gRPC, port 8085)
+- Secret Manager (gRPC, port 8086)
+- Firestore (gRPC, port 8088)
+- Cloud Tasks (gRPC, port 8089)
+- Vertex AI (REST, port 8090) — supports Ollama, OpenAI, Anthropic backends
+- Cloud KMS (gRPC, port 8091)
+- Cloud Logging (gRPC, port 8092)
+- Cloud Run (gRPC, port 8093)
+
+Four services are orchestrated via Docker containers (opt-in, lazy startup):
+- Spanner (gRPC, port 9010) — official Google emulator
+- Bigtable (gRPC, port 9094) — official Google emulator
+- Cloud SQL (TCP, port 5432) — PostgreSQL 16
+- Memorystore (TCP, port 6379) — Redis 7
+
+## Quick Start
+
+```bash
+brew install slokam-ai/tap/localgcp
+localgcp up
+eval $(localgcp env)
+```
+
+For orchestrated services (requires Docker):
+```bash
+localgcp up --services=spanner,bigtable,cloudsql,memorystore
+```
+
+## Key Features
+
+- Sub-100ms startup for native services
+- Lazy Docker orchestration: containers start only on first connection
+- Works with official GCP client libraries (Go, Python, Java, Node.js)
+- Vertex AI with local LLM inference via Ollama
+- In-memory by default, optional persistence via --data-dir
+- CI/CD ready: no credentials needed
+
+## Links
+
+- Website: https://localgcp.com
+- Documentation: https://localgcp.com/docs/
+- GitHub: https://github.com/slokam-ai/localgcp
+- Install: brew install slokam-ai/tap/localgcp
+
+## License
+
+MIT

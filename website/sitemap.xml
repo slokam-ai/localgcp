@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://localgcp.com/</loc><priority>1.0</priority></url>
+  <url><loc>https://localgcp.com/docs/</loc><priority>0.9</priority></url>
+  <url><loc>https://localgcp.com/docs/vertex-ai.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/cloud-storage.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/pubsub.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/firestore.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/secret-manager.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/cloud-tasks.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/cloud-kms.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/cloud-logging.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/cloud-run.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/spanner.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/bigtable.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/cloud-sql.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/memorystore.html</loc><priority>0.8</priority></url>
+</urlset>
