@@ -289,15 +289,28 @@ See [ROADMAP.md](ROADMAP.md) for what's coming next.
 
 ### macOS "Not Opened" / Gatekeeper warning
 
-If macOS shows "localgcp Not Opened" after installing via Homebrew, run:
+If macOS blocks the binary, reinstall with the latest formula (v0.5.1+):
+
+```bash
+brew uninstall --cask localgcp 2>/dev/null   # remove old cask if present
+brew untap slokam-ai/tap 2>/dev/null
+brew tap slokam-ai/tap
+brew install slokam-ai/tap/localgcp
+```
+
+If still blocked, remove the quarantine flag manually:
 
 ```bash
 xattr -d com.apple.quarantine $(which localgcp)
 ```
 
-Or reinstall with the latest formula (v0.5.1+) which fixes this:
+### "Already installed" when upgrading
+
+If Homebrew says "already installed" but localgcp doesn't work, an old cask version may be cached. Uninstall and reinstall:
 
 ```bash
+brew uninstall localgcp 2>/dev/null
+brew uninstall --cask localgcp 2>/dev/null
 brew untap slokam-ai/tap 2>/dev/null
 brew tap slokam-ai/tap
 brew install slokam-ai/tap/localgcp
