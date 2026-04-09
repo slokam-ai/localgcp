@@ -492,5 +492,197 @@ func recvWithTimeout(stream firestorepb.Firestore_ListenClient, timeout time.Dur
 	}
 }
 
+func TestListenResumeTokenBasic(t *testing.T) {
+	client, svc, cleanup := listenTestClient(t)
+	defer cleanup()
+
+	parent := "projects/test/databases/(default)/documents"
+
+	// Create a document before listening.
+	svc.store.CreateDocument(parent+"/tasks/t1", map[string]*firestorepb.Value{
+		"status": strVal("open"),
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream, err := client.Listen(ctx)
+	if err != nil {
+		t.Fatalf("Listen: %v", err)
+	}
+
+	// Add target for "tasks" collection.
+	err = stream.Send(&firestorepb.ListenRequest{
+		Database: "projects/test/databases/(default)",
+		TargetChange: &firestorepb.ListenRequest_AddTarget{
+			AddTarget: &firestorepb.Target{
+				TargetId: 1,
+				TargetType: &firestorepb.Target_Query{
+					Query: &firestorepb.Target_QueryTarget{
+						Parent: parent,
+						QueryType: &firestorepb.Target_QueryTarget_StructuredQuery{
+							StructuredQuery: &firestorepb.StructuredQuery{
+								From: []*firestorepb.StructuredQuery_CollectionSelector{
+									{CollectionId: "tasks"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	// Expect: ADD, DocumentChange(t1), CURRENT.
+	responses := recvN(t, stream, 3, 3*time.Second)
+	tc := responses[2].GetTargetChange()
+	if tc == nil || tc.TargetChangeType != firestorepb.TargetChange_CURRENT {
+		t.Fatal("expected CURRENT")
+	}
+	if len(tc.ResumeToken) != 8 {
+		t.Fatalf("expected 8-byte resume token, got %d bytes", len(tc.ResumeToken))
+	}
+	resumeToken := tc.ResumeToken
+
+	// Create another document while stream is active.
+	svc.store.CreateDocument(parent+"/tasks/t2", map[string]*firestorepb.Value{
+		"status": strVal("pending"),
+	})
+	recvN(t, stream, 1, 3*time.Second) // consume the real-time event
+
+	// Now simulate a reconnect: remove old target and re-add with resume token.
+	stream.Send(&firestorepb.ListenRequest{
+		Database: "projects/test/databases/(default)",
+		TargetChange: &firestorepb.ListenRequest_RemoveTarget{
+			RemoveTarget: 1,
+		},
+	})
+	recvN(t, stream, 1, 3*time.Second) // REMOVE
+
+	// Re-add with resume token — should get incremental changes, not full snapshot.
+	err = stream.Send(&firestorepb.ListenRequest{
+		Database: "projects/test/databases/(default)",
+		TargetChange: &firestorepb.ListenRequest_AddTarget{
+			AddTarget: &firestorepb.Target{
+				TargetId: 2,
+				ResumeType: &firestorepb.Target_ResumeToken{ResumeToken: resumeToken},
+				TargetType: &firestorepb.Target_Query{
+					Query: &firestorepb.Target_QueryTarget{
+						Parent: parent,
+						QueryType: &firestorepb.Target_QueryTarget_StructuredQuery{
+							StructuredQuery: &firestorepb.StructuredQuery{
+								From: []*firestorepb.StructuredQuery_CollectionSelector{
+									{CollectionId: "tasks"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Send resume: %v", err)
+	}
+
+	// Expect: ADD, DocumentChange(t2 only — the change since resume token), CURRENT.
+	responses = recvN(t, stream, 3, 3*time.Second)
+	if responses[0].GetTargetChange().GetTargetChangeType() != firestorepb.TargetChange_ADD {
+		t.Fatal("expected ADD")
+	}
+	dc := responses[1].GetDocumentChange()
+	if dc == nil {
+		t.Fatalf("expected DocumentChange, got %v", responses[1])
+	}
+	if dc.Document.Fields["status"].GetStringValue() != "pending" {
+		t.Fatalf("expected t2 (pending), got %s", dc.Document.Fields["status"].GetStringValue())
+	}
+	if responses[2].GetTargetChange().GetTargetChangeType() != firestorepb.TargetChange_CURRENT {
+		t.Fatal("expected CURRENT")
+	}
+}
+
+func TestListenResumeTokenFallsBackToSnapshot(t *testing.T) {
+	client, svc, cleanup := listenTestClient(t)
+	defer cleanup()
+
+	parent := "projects/test/databases/(default)/documents"
+
+	svc.store.CreateDocument(parent+"/items/a", map[string]*firestorepb.Value{
+		"v": strVal("1"),
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stream, err := client.Listen(ctx)
+	if err != nil {
+		t.Fatalf("Listen: %v", err)
+	}
+
+	// Use a bogus resume token (wrong length) — should fall back to full snapshot.
+	err = stream.Send(&firestorepb.ListenRequest{
+		Database: "projects/test/databases/(default)",
+		TargetChange: &firestorepb.ListenRequest_AddTarget{
+			AddTarget: &firestorepb.Target{
+				TargetId:    1,
+				ResumeType: &firestorepb.Target_ResumeToken{ResumeToken: []byte("bad")},
+				TargetType: &firestorepb.Target_Query{
+					Query: &firestorepb.Target_QueryTarget{
+						Parent: parent,
+						QueryType: &firestorepb.Target_QueryTarget_StructuredQuery{
+							StructuredQuery: &firestorepb.StructuredQuery{
+								From: []*firestorepb.StructuredQuery_CollectionSelector{
+									{CollectionId: "items"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	// Should get full snapshot: ADD, DocumentChange(a), CURRENT.
+	responses := recvN(t, stream, 3, 3*time.Second)
+	if responses[0].GetTargetChange().GetTargetChangeType() != firestorepb.TargetChange_ADD {
+		t.Fatal("expected ADD")
+	}
+	dc := responses[1].GetDocumentChange()
+	if dc == nil || dc.Document.Fields["v"].GetStringValue() != "1" {
+		t.Fatal("expected full snapshot with item a")
+	}
+	if responses[2].GetTargetChange().GetTargetChangeType() != firestorepb.TargetChange_CURRENT {
+		t.Fatal("expected CURRENT")
+	}
+}
+
+func TestResumeTokenEncodeDecode(t *testing.T) {
+	for _, seq := range []uint64{0, 1, 42, 1<<32 - 1, 1 << 63} {
+		token := EncodeResumeToken(seq)
+		got, ok := DecodeResumeToken(token)
+		if !ok {
+			t.Fatalf("DecodeResumeToken failed for seq=%d", seq)
+		}
+		if got != seq {
+			t.Fatalf("round-trip failed: encoded %d, decoded %d", seq, got)
+		}
+	}
+
+	// Invalid tokens.
+	if _, ok := DecodeResumeToken(nil); ok {
+		t.Fatal("expected decode failure for nil")
+	}
+	if _, ok := DecodeResumeToken([]byte("short")); ok {
+		t.Fatal("expected decode failure for wrong length")
+	}
+}
+
 // Suppress unused import warning for wrapperspb in this file.
 var _ = wrapperspb.Int32Value{}

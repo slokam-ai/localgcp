@@ -25,6 +25,7 @@ Fill the gaps that matter most for real-world adoption.
 - [x] Pub/Sub dead letter topic support
 - [x] Cloud Tasks (queue/task CRUD, HTTP dispatch, scheduling)
 - [x] GCS signed URLs
+- [x] README prior art section
 - [ ] ~~Eventarc~~ (deferred to Phase 3, depends on Cloud Run)
 - [ ] ~~Firestore collection group queries~~ (deferred to Phase 3, complex indexing)
 

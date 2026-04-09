@@ -203,7 +203,7 @@ GCP client libraries already support `*_EMULATOR_HOST` environment variables. Wh
 
 - Cloud Storage: bucket versioning, object compose, IAM policies
 - Pub/Sub: exactly-once delivery, message ordering
-- Firestore: composite indexes, collection group queries, resume tokens for listeners
+- Firestore: composite indexes, collection group queries
 - Cloud Tasks: App Engine task targets, OIDC/OAuth authentication
 - Vertex AI: streaming (streamGenerateContent), tool/function calling, multimodal (images/audio), multi-provider backends (OpenAI, Anthropic)
 - Secret Manager: IAM bindings, replication policies, rotation
@@ -231,6 +231,15 @@ Run tests:
 ```bash
 go test ./...
 ```
+
+## Prior art
+
+localgcp builds on the shoulders of excellent standalone emulators:
+
+- [fsouza/fake-gcs-server](https://github.com/fsouza/fake-gcs-server) — GCS emulator with broad API coverage
+- [aertje/cloud-tasks-emulator](https://github.com/aertje/cloud-tasks-emulator) — Cloud Tasks emulator with App Engine support
+
+localgcp's differentiator is the **unified single-binary** approach: one process, six services, zero configuration. If you only need one service and want deeper API coverage, these standalone projects are great choices.
 
 ## Contributing
 
