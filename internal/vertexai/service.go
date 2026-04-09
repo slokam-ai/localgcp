@@ -34,16 +34,30 @@ type Service struct {
 }
 
 // New creates a new Vertex AI service.
-func New(dataDir string, quiet bool, ollamaHost string, modelMapStr string) *Service {
+// backendType is "ollama" (default), "openai", "anthropic", or "stub".
+// apiKey is used for OpenAI/Anthropic backends.
+func New(dataDir string, quiet bool, ollamaHost, modelMapStr, backendType, apiKey string) *Service {
 	logger := log.New(os.Stderr, "[vertexai] ", log.LstdFlags)
 
 	var backend Backend
-	if ollamaHost != "" {
-		backend = NewOllamaBackend(ollamaHost)
-		logger.Printf("Using Ollama backend at %s", ollamaHost)
-	} else {
+	switch backendType {
+	case "openai":
+		backend = NewOpenAIBackend(apiKey, "")
+		logger.Printf("Using OpenAI backend")
+	case "anthropic":
+		backend = NewAnthropicBackend(apiKey, "")
+		logger.Printf("Using Anthropic backend")
+	case "stub":
 		backend = &StubBackend{}
-		logger.Printf("No Ollama host configured, using stub backend")
+		logger.Printf("Using stub backend")
+	default: // "ollama" or empty
+		if ollamaHost != "" {
+			backend = NewOllamaBackend(ollamaHost)
+			logger.Printf("Using Ollama backend at %s", ollamaHost)
+		} else {
+			backend = &StubBackend{}
+			logger.Printf("No Ollama host configured, using stub backend")
+		}
 	}
 
 	modelMap := defaultModelMap()
@@ -139,6 +153,8 @@ func (s *Service) handleRequest(w http.ResponseWriter, r *http.Request) {
 	switch modelMethod.method {
 	case "generateContent":
 		s.handleGenerateContent(w, r, modelMethod.model)
+	case "streamGenerateContent":
+		s.handleStreamGenerateContent(w, r, modelMethod.model)
 	case "embedContent", "predict":
 		s.handleEmbedContent(w, r, modelMethod.model)
 	default:
@@ -173,15 +189,14 @@ func extractModelAndMethod(path string) *modelAndMethod {
 	}
 }
 
-func (s *Service) handleGenerateContent(w http.ResponseWriter, r *http.Request, model string) {
+// parseGenerateRequest decodes the Vertex AI JSON body into our intermediate format.
+func (s *Service) parseGenerateRequest(r *http.Request) (*vertexGenerateRequest, *GenerateRequest, error) {
 	var req vertexGenerateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse(400, "INVALID_ARGUMENT", "Invalid JSON body"))
-		return
+		return nil, nil, err
 	}
 
-	// Build intermediate request.
-	genReq := &GenerateRequest{Model: model}
+	genReq := &GenerateRequest{Model: req.Model}
 
 	// System instruction.
 	if req.SystemInstruction != nil {
@@ -199,9 +214,23 @@ func (s *Service) handleGenerateContent(w http.ResponseWriter, r *http.Request, 
 			role = "user"
 		}
 		for _, part := range content.Parts {
+			msg := Message{Role: role}
 			if part.Text != "" {
-				genReq.Messages = append(genReq.Messages, Message{Role: role, Content: part.Text})
+				msg.Content = part.Text
 			}
+			if part.FunctionCall != nil {
+				msg.FunctionCall = &FunctionCall{
+					Name: part.FunctionCall.Name,
+					Args: part.FunctionCall.Args,
+				}
+			}
+			if part.FunctionResponse != nil {
+				msg.FunctionResponse = &FunctionResponse{
+					Name:     part.FunctionResponse.Name,
+					Response: part.FunctionResponse.Response,
+				}
+			}
+			genReq.Messages = append(genReq.Messages, msg)
 		}
 	}
 
@@ -210,7 +239,27 @@ func (s *Service) handleGenerateContent(w http.ResponseWriter, r *http.Request, 
 		genReq.MaxOutputTokens = req.GenerationConfig.MaxOutputTokens
 	}
 
-	// Resolve model alias.
+	// Tools.
+	for _, tool := range req.Tools {
+		for _, fd := range tool.FunctionDeclarations {
+			genReq.Tools = append(genReq.Tools, Tool{
+				Name:        fd.Name,
+				Description: fd.Description,
+				Parameters:  fd.Parameters,
+			})
+		}
+	}
+
+	return &req, genReq, nil
+}
+
+func (s *Service) handleGenerateContent(w http.ResponseWriter, r *http.Request, model string) {
+	_, genReq, err := s.parseGenerateRequest(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(400, "INVALID_ARGUMENT", "Invalid JSON body"))
+		return
+	}
+
 	backendModel := s.resolveModel(model)
 
 	resp, err := s.backend.GenerateContent(backendModel, genReq)
@@ -220,16 +269,56 @@ func (s *Service) handleGenerateContent(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, vertexGenerateResponse{
-		Candidates: []vertexCandidate{{
-			Content: vertexContent{
-				Role:  "model",
-				Parts: []vertexPart{{Text: resp.Text}},
-			},
-			FinishReason:  resp.FinishReason,
-			SafetyRatings: []interface{}{},
-		}},
-	})
+	writeJSON(w, http.StatusOK, buildVertexResponse(resp))
+}
+
+func (s *Service) handleStreamGenerateContent(w http.ResponseWriter, r *http.Request, model string) {
+	_, genReq, err := s.parseGenerateRequest(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse(400, "INVALID_ARGUMENT", "Invalid JSON body"))
+		return
+	}
+
+	backendModel := s.resolveModel(model)
+
+	ch := make(chan StreamChunk, 64)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- s.backend.StreamGenerateContent(backendModel, genReq, ch)
+	}()
+
+	// Vertex AI streaming uses SSE-like JSON array format.
+	// The SDK expects: Content-Type application/json with an array of response objects,
+	// but the actual wire format uses chunked transfer with one JSON object per chunk
+	// separated by newlines, wrapped in a JSON array.
+	w.Header().Set("Content-Type", "application/json")
+	flusher, canFlush := w.(http.Flusher)
+
+	// Write opening bracket.
+	w.Write([]byte("["))
+	first := true
+
+	for chunk := range ch {
+		if !first {
+			w.Write([]byte(",\n"))
+		}
+		first = false
+
+		resp := buildVertexStreamChunk(&chunk)
+		data, _ := json.Marshal(resp)
+		w.Write(data)
+
+		if canFlush {
+			flusher.Flush()
+		}
+	}
+
+	// Write closing bracket.
+	w.Write([]byte("]"))
+
+	if err := <-errCh; err != nil {
+		s.logger.Printf("streamGenerateContent error: %v", err)
+	}
 }
 
 func (s *Service) handleEmbedContent(w http.ResponseWriter, r *http.Request, model string) {
@@ -303,9 +392,11 @@ func (s *Service) resolveModel(model string) string {
 // --- Vertex AI JSON types ---
 
 type vertexGenerateRequest struct {
-	Contents          []vertexContent    `json:"contents"`
-	SystemInstruction *vertexContent     `json:"systemInstruction,omitempty"`
-	GenerationConfig  *vertexGenConfig   `json:"generationConfig,omitempty"`
+	Contents          []vertexContent       `json:"contents"`
+	SystemInstruction *vertexContent        `json:"systemInstruction,omitempty"`
+	GenerationConfig  *vertexGenConfig      `json:"generationConfig,omitempty"`
+	Tools             []vertexToolDecl      `json:"tools,omitempty"`
+	Model             string                `json:"model,omitempty"`
 }
 
 type vertexContent struct {
@@ -314,7 +405,29 @@ type vertexContent struct {
 }
 
 type vertexPart struct {
-	Text string `json:"text,omitempty"`
+	Text             string                `json:"text,omitempty"`
+	FunctionCall     *vertexFunctionCall   `json:"functionCall,omitempty"`
+	FunctionResponse *vertexFunctionResp   `json:"functionResponse,omitempty"`
+}
+
+type vertexFunctionCall struct {
+	Name string                 `json:"name"`
+	Args map[string]interface{} `json:"args"`
+}
+
+type vertexFunctionResp struct {
+	Name     string                 `json:"name"`
+	Response map[string]interface{} `json:"response"`
+}
+
+type vertexToolDecl struct {
+	FunctionDeclarations []vertexFunctionDecl `json:"functionDeclarations"`
+}
+
+type vertexFunctionDecl struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Parameters  map[string]interface{} `json:"parameters"`
 }
 
 type vertexGenConfig struct {
@@ -330,6 +443,62 @@ type vertexCandidate struct {
 	Content       vertexContent   `json:"content"`
 	FinishReason  string          `json:"finishReason"`
 	SafetyRatings []interface{}   `json:"safetyRatings"`
+}
+
+// buildVertexResponse converts our intermediate response to the Vertex AI JSON format.
+func buildVertexResponse(resp *GenerateResponse) vertexGenerateResponse {
+	var parts []vertexPart
+	if resp.FunctionCall != nil {
+		parts = append(parts, vertexPart{
+			FunctionCall: &vertexFunctionCall{
+				Name: resp.FunctionCall.Name,
+				Args: resp.FunctionCall.Args,
+			},
+		})
+	} else {
+		parts = append(parts, vertexPart{Text: resp.Text})
+	}
+
+	return vertexGenerateResponse{
+		Candidates: []vertexCandidate{{
+			Content: vertexContent{
+				Role:  "model",
+				Parts: parts,
+			},
+			FinishReason:  resp.FinishReason,
+			SafetyRatings: []interface{}{},
+		}},
+	}
+}
+
+// buildVertexStreamChunk converts a stream chunk to the Vertex AI JSON format.
+func buildVertexStreamChunk(chunk *StreamChunk) vertexGenerateResponse {
+	var parts []vertexPart
+	if chunk.FunctionCall != nil {
+		parts = append(parts, vertexPart{
+			FunctionCall: &vertexFunctionCall{
+				Name: chunk.FunctionCall.Name,
+				Args: chunk.FunctionCall.Args,
+			},
+		})
+	} else {
+		parts = append(parts, vertexPart{Text: chunk.Text})
+	}
+
+	candidate := vertexCandidate{
+		Content: vertexContent{
+			Role:  "model",
+			Parts: parts,
+		},
+		SafetyRatings: []interface{}{},
+	}
+	if chunk.FinishReason != "" {
+		candidate.FinishReason = chunk.FinishReason
+	}
+
+	return vertexGenerateResponse{
+		Candidates: []vertexCandidate{candidate},
+	}
 }
 
 type vertexEmbedRequest struct {
@@ -379,4 +548,11 @@ type statusWriter struct {
 func (w *statusWriter) WriteHeader(code int) {
 	w.statusCode = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+// Flush implements http.Flusher for the status-capturing wrapper.
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }

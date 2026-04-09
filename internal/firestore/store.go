@@ -1,6 +1,7 @@
 package firestore
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/firestore/apiv1/firestorepb"
@@ -36,6 +38,7 @@ type changeEvent struct {
 	DocName    string
 	ChangeType ChangeType
 	Doc        *firestorepb.Document // nil for ChangeRemoved
+	Seq        uint64                // global sequence number for resume tokens
 }
 
 // watcher represents a registered listener on a collection or document.
@@ -62,23 +65,33 @@ func (w *watcher) matches(name string) bool {
 	return false
 }
 
+// changeLogSize is the maximum number of recent change events retained for
+// resume token support. Clients that reconnect within this window get
+// incremental updates instead of a full snapshot resend.
+const changeLogSize = 1024
+
 // Store is an in-memory hierarchical document store with optional JSON persistence.
 type Store struct {
 	mu   sync.RWMutex
 	docs map[string]*storedDocument // full document path -> document
 	dir  string                     // persistence directory; empty = in-memory only
 
-	watchMu  sync.Mutex
-	watchers map[int32]*watcher
+	watchMu   sync.Mutex
+	watchers  map[int32]*watcher
+	seq       atomic.Uint64          // global mutation sequence counter
+	changeLog []*changeEvent         // bounded ring buffer of recent events
+	logStart  int                    // ring buffer start index
+	logLen    int                    // number of valid entries
 }
 
 // NewStore creates a new document store. If dir is non-empty, state is loaded
 // from disk and flushed on every write.
 func NewStore(dir string) *Store {
 	s := &Store{
-		docs:     make(map[string]*storedDocument),
-		dir:      dir,
-		watchers: make(map[int32]*watcher),
+		docs:      make(map[string]*storedDocument),
+		dir:       dir,
+		watchers:  make(map[int32]*watcher),
+		changeLog: make([]*changeEvent, changeLogSize),
 	}
 	if dir != "" {
 		s.load()
@@ -112,11 +125,21 @@ func (s *Store) RemoveWatcher(targetID int32) {
 	s.watchMu.Unlock()
 }
 
-// notifyWatchers sends a change event to all matching watchers.
+// notifyWatchers sends a change event to all matching watchers and appends
+// the event to the bounded change log for resume token support.
 // Must be called AFTER releasing mu.
 func (s *Store) notifyWatchers(name string, ct ChangeType, doc *firestorepb.Document) {
-	evt := &changeEvent{DocName: name, ChangeType: ct, Doc: doc}
+	seq := s.seq.Add(1)
+	evt := &changeEvent{DocName: name, ChangeType: ct, Doc: doc, Seq: seq}
 	s.watchMu.Lock()
+	// Append to ring buffer.
+	idx := (s.logStart + s.logLen) % changeLogSize
+	s.changeLog[idx] = evt
+	if s.logLen < changeLogSize {
+		s.logLen++
+	} else {
+		s.logStart = (s.logStart + 1) % changeLogSize
+	}
 	for _, w := range s.watchers {
 		if w.matches(name) {
 			select {
@@ -126,6 +149,57 @@ func (s *Store) notifyWatchers(name string, ct ChangeType, doc *firestorepb.Docu
 		}
 	}
 	s.watchMu.Unlock()
+}
+
+// EncodeResumeToken encodes a sequence number into a resume token.
+func EncodeResumeToken(seq uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, seq)
+	return b
+}
+
+// DecodeResumeToken decodes a resume token back to a sequence number.
+// Returns 0, false if the token is invalid.
+func DecodeResumeToken(token []byte) (uint64, bool) {
+	if len(token) != 8 {
+		return 0, false
+	}
+	return binary.BigEndian.Uint64(token), true
+}
+
+// CurrentSeq returns the current sequence number (for generating resume tokens
+// when no changes have occurred, e.g. initial CURRENT response).
+func (s *Store) CurrentSeq() uint64 {
+	return s.seq.Load()
+}
+
+// ChangesSince returns all change events with sequence > afterSeq that match
+// the given prefix/docName filter. Returns nil, false if the requested sequence
+// has been evicted from the change log (client must do a full snapshot).
+func (s *Store) ChangesSince(afterSeq uint64, prefix, docName string) ([]*changeEvent, bool) {
+	w := &watcher{prefix: prefix, docName: docName}
+	s.watchMu.Lock()
+	defer s.watchMu.Unlock()
+
+	if s.logLen == 0 {
+		return nil, true
+	}
+
+	// Check if the oldest entry in the log is still <= afterSeq+1.
+	oldest := s.changeLog[s.logStart]
+	if oldest.Seq > afterSeq+1 {
+		// Gap: events have been evicted. Caller must full-snapshot.
+		return nil, false
+	}
+
+	var events []*changeEvent
+	for i := 0; i < s.logLen; i++ {
+		evt := s.changeLog[(s.logStart+i)%changeLogSize]
+		if evt.Seq > afterSeq && w.matches(evt.DocName) {
+			events = append(events, evt)
+		}
+	}
+	return events, true
 }
 
 // SnapshotDocuments returns copies of all documents matching either a

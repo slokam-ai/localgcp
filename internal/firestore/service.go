@@ -449,30 +449,52 @@ func (fs *firestoreServer) Listen(stream firestorepb.Firestore_ListenServer) err
 					return err
 				}
 
-				// 3. Snapshot and send initial documents.
-				snapshot := fs.svc.store.SnapshotDocuments(prefix, docName)
-				now := timestamppb.Now()
-				for _, doc := range snapshot {
-					if err := stream.Send(&firestorepb.ListenResponse{
-						ResponseType: &firestorepb.ListenResponse_DocumentChange{
-							DocumentChange: &firestorepb.DocumentChange{
-								Document:  doc,
-								TargetIds: []int32{targetID},
-							},
-						},
-					}); err != nil {
-						return err
+				// 3. Resume or full snapshot.
+				// If the client sent a resume token, try to replay only
+				// changes since that point instead of a full snapshot.
+				var currentSeq uint64
+				resumeToken := target.GetResumeToken()
+				afterSeq, validToken := DecodeResumeToken(resumeToken)
+				resumed := false
+				if validToken && afterSeq > 0 {
+					changes, ok := fs.svc.store.ChangesSince(afterSeq, prefix, docName)
+					if ok {
+						resumed = true
+						for _, evt := range changes {
+							if err := fs.sendDocumentChange(stream, evt, []int32{targetID}); err != nil {
+								return err
+							}
+						}
+						currentSeq = fs.svc.store.CurrentSeq()
 					}
 				}
+				if !resumed {
+					// Full snapshot.
+					snapshot := fs.svc.store.SnapshotDocuments(prefix, docName)
+					for _, doc := range snapshot {
+						if err := stream.Send(&firestorepb.ListenResponse{
+							ResponseType: &firestorepb.ListenResponse_DocumentChange{
+								DocumentChange: &firestorepb.DocumentChange{
+									Document:  doc,
+									TargetIds: []int32{targetID},
+								},
+							},
+						}); err != nil {
+							return err
+						}
+					}
+					currentSeq = fs.svc.store.CurrentSeq()
+				}
 
-				// 4. Send TargetChange CURRENT.
+				// 4. Send TargetChange CURRENT with resume token.
+				now := timestamppb.Now()
 				if err := stream.Send(&firestorepb.ListenResponse{
 					ResponseType: &firestorepb.ListenResponse_TargetChange{
 						TargetChange: &firestorepb.TargetChange{
 							TargetChangeType: firestorepb.TargetChange_CURRENT,
 							TargetIds:        []int32{targetID},
 							ReadTime:         now,
-							ResumeToken:      []byte{},
+							ResumeToken:      EncodeResumeToken(currentSeq),
 						},
 					},
 				}); err != nil {

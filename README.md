@@ -164,9 +164,10 @@ Your GCP client libraries work against localgcp with zero code changes (except S
 
 ### Vertex AI (Gemini API)
 - Text generation (generateContent) via local models or stub responses
+- Streaming (streamGenerateContent) with real-time token output
+- Tool/function calling: declare tools, receive function calls, send results
 - Text embeddings (embedContent/predict) with configurable dimensions
-- Ollama backend: proxy Vertex AI calls to local LLMs (llama3, gemma, etc.)
-- Stub backend: deterministic responses when no model runner is available (CI/CD)
+- Multi-provider backends: Ollama (default), OpenAI, Anthropic, or stub
 - Model alias registry: map Vertex model names to local model names (e.g. `gemini-2.5-flash` -> `llama3.2`)
 - Works with the official `google.golang.org/genai` SDK via `HTTPOptions.BaseURL`
 
@@ -191,6 +192,8 @@ localgcp --version         Print version
 | `--port-vertexai` | 8090 | Vertex AI port |
 | `--ollama-host` | `http://localhost:11434` | Ollama API host for Vertex AI |
 | `--vertex-model-map` | (defaults) | Model aliases (e.g. `gemini-2.5-flash=llama3.2`) |
+| `--vertex-backend` | `ollama` | Backend provider: `ollama`, `openai`, `anthropic`, `stub` |
+| `--vertex-api-key` | | API key for OpenAI/Anthropic backends |
 | `--quiet`, `-q` | false | Suppress request logging |
 
 ## How it works
@@ -203,9 +206,9 @@ GCP client libraries already support `*_EMULATOR_HOST` environment variables. Wh
 
 - Cloud Storage: bucket versioning, object compose, IAM policies
 - Pub/Sub: exactly-once delivery, message ordering
-- Firestore: composite indexes, collection group queries, resume tokens for listeners
+- Firestore: composite indexes, collection group queries
 - Cloud Tasks: App Engine task targets, OIDC/OAuth authentication
-- Vertex AI: streaming (streamGenerateContent), tool/function calling, multimodal (images/audio), multi-provider backends (OpenAI, Anthropic)
+- Vertex AI: multimodal (images/audio)
 - Secret Manager: IAM bindings, replication policies, rotation
 - IAM/auth enforcement (all requests are accepted)
 
@@ -231,6 +234,15 @@ Run tests:
 ```bash
 go test ./...
 ```
+
+## Prior art
+
+localgcp builds on the shoulders of excellent standalone emulators:
+
+- [fsouza/fake-gcs-server](https://github.com/fsouza/fake-gcs-server) — GCS emulator with broad API coverage
+- [aertje/cloud-tasks-emulator](https://github.com/aertje/cloud-tasks-emulator) — Cloud Tasks emulator with App Engine support
+
+localgcp's differentiator is the **unified single-binary** approach: one process, six services, zero configuration. If you only need one service and want deeper API coverage, these standalone projects are great choices.
 
 ## Contributing
 

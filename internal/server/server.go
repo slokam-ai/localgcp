@@ -24,6 +24,8 @@ type Config struct {
 	Quiet             bool
 	OllamaHost        string
 	VertexModelMap    string
+	VertexBackend     string // "ollama" (default), "openai", "anthropic", "stub"
+	VertexAPIKey      string // API key for OpenAI/Anthropic backends
 }
 
 // DefaultConfig returns the default server configuration.
