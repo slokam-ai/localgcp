@@ -42,6 +42,8 @@ type ContainerConfig struct {
 	InternalPort  string            // port inside container (e.g. "9010/tcp")
 	Cmd           []string          // optional command override
 	Env           []string          // environment variables
+	Volumes       map[string]string // host path -> container path (for data persistence)
+	DataPath      string            // container-internal data directory (for WithDataDir)
 }
 
 // DockerRuntime implements ContainerRuntime using the Docker Go SDK.
@@ -205,6 +207,15 @@ func (d *DockerRuntime) Create(ctx context.Context, cfg ContainerConfig) (string
 				HostPort: "0", // let Docker assign a free port
 			}},
 		},
+	}
+
+	// Mount volumes for data persistence.
+	if len(cfg.Volumes) > 0 {
+		var binds []string
+		for hostPath, containerPath := range cfg.Volumes {
+			binds = append(binds, hostPath+":"+containerPath)
+		}
+		hostCfg.Binds = binds
 	}
 
 	resp, err := d.cli.ContainerCreate(ctx, containerCfg, hostCfg, nil, nil, cfg.Name)

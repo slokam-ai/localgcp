@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -380,5 +382,56 @@ func TestMockRuntimeAvailability(t *testing.T) {
 	mock.available = false
 	if mock.Available() {
 		t.Fatal("mock should be unavailable")
+	}
+}
+
+func TestWithDataDir(t *testing.T) {
+	// Cloud SQL supports persistence.
+	cfg := WithDataDir(CloudSQLConfig, t.TempDir())
+	if len(cfg.Volumes) != 1 {
+		t.Fatalf("expected 1 volume mount, got %d", len(cfg.Volumes))
+	}
+	for _, containerPath := range cfg.Volumes {
+		if containerPath != "/var/lib/postgresql/data" {
+			t.Fatalf("expected postgres data path, got %s", containerPath)
+		}
+	}
+
+	// Redis gets appendonly cmd when persisting.
+	cfg = WithDataDir(MemorystoreConfig, t.TempDir())
+	if len(cfg.Volumes) != 1 {
+		t.Fatal("expected 1 volume for redis")
+	}
+	if len(cfg.Cmd) == 0 || cfg.Cmd[0] != "redis-server" {
+		t.Fatalf("expected redis-server cmd, got %v", cfg.Cmd)
+	}
+
+	// Spanner doesn't support persistence (DataPath empty).
+	cfg = WithDataDir(SpannerConfig, t.TempDir())
+	if len(cfg.Volumes) != 0 {
+		t.Fatal("spanner should have no volumes")
+	}
+
+	// Empty dataDir returns config unchanged.
+	cfg = WithDataDir(CloudSQLConfig, "")
+	if len(cfg.Volumes) != 0 {
+		t.Fatal("empty dataDir should have no volumes")
+	}
+}
+
+func TestWithDataDirCreatesDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	dataDir := filepath.Join(tmpDir, "localgcp-data")
+
+	cfg := WithDataDir(CloudSQLConfig, dataDir)
+	if len(cfg.Volumes) != 1 {
+		t.Fatal("expected volume mount")
+	}
+
+	// Verify the host directory was created.
+	for hostPath := range cfg.Volumes {
+		if _, err := os.Stat(hostPath); os.IsNotExist(err) {
+			t.Fatalf("expected host directory %s to be created", hostPath)
+		}
 	}
 }

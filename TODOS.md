@@ -25,14 +25,11 @@
 
 ## Phase 4 — Docker Orchestrator
 
-### `localgcp pull` command
-- **What:** `localgcp pull [--services=spanner,bigtable]` pre-fetches Docker images so first-request latency is 3s (container start) not 30-60s (pull + start).
-- **Why:** Major UX improvement. Eliminates cold-pull surprise, enables offline setup.
-- **Context:** ~30 lines using ContainerRuntime.Pull(). Design doc lists as next step after Spanner MVP.
-- **Depends on:** ContainerRuntime interface (v0.5.0 orchestrator package).
+### ~~`localgcp pull` command~~ (DONE)
+- `localgcp pull [--services=spanner,bigtable]` pre-fetches Docker images.
+- Pulls all 4 images by default, or specific services via `--services` flag.
 
-### Data persistence for orchestrated containers
-- **What:** Map `--data-dir` to Docker volume mounts so Spanner/Bigtable data survives container restart.
-- **Why:** Native services already support `--data-dir`. Orchestrated services should match for consistency.
-- **Context:** Each emulator has different persistence flags. Spanner has limited persistence support. v0.5.0 uses ephemeral containers.
-- **Depends on:** Orchestrator MVP (v0.5.0).
+### ~~Data persistence for orchestrated containers~~ (DONE)
+- `--data-dir` mounts host volumes into Docker containers for Cloud SQL and Memorystore.
+- Redis gets `appendonly yes` mode when persisting. Postgres mounts `/var/lib/postgresql/data`.
+- Spanner and Bigtable emulators don't support persistence (ephemeral only).
