@@ -305,7 +305,7 @@ localgcp builds on the shoulders of excellent standalone emulators:
 - [fsouza/fake-gcs-server](https://github.com/fsouza/fake-gcs-server) — GCS emulator with broad API coverage
 - [aertje/cloud-tasks-emulator](https://github.com/aertje/cloud-tasks-emulator) — Cloud Tasks emulator with App Engine support
 
-localgcp's differentiator is the **unified single-binary** approach: one process, six services, zero configuration. If you only need one service and want deeper API coverage, these standalone projects are great choices.
+localgcp's differentiator is the **unified single-binary** approach: one process, thirteen services, zero configuration. If you only need one service and want deeper API coverage, these standalone projects are great choices.
 
 ## Contributing
 
@@ -317,4 +317,4 @@ MIT. See [LICENSE](LICENSE).
 
 ---
 
-Built by [Slokam AI](https://slokam.ai). Visit [localgcp.com](https://localgcp.com) for more.
+Built by [yogirk](https://github.com/yogirk). Visit [localgcp.com](https://localgcp.com) for more.
