@@ -33,3 +33,12 @@
 - `--data-dir` mounts host volumes into Docker containers for Cloud SQL and Memorystore.
 - Redis gets `appendonly yes` mode when persisting. Postgres mounts `/var/lib/postgresql/data`.
 - Spanner and Bigtable emulators don't support persistence (ephemeral only).
+
+## Future Services
+
+### BigQuery emulator (orchestrated)
+- **What:** Add BigQuery as an orchestrated service using [goccy/bigquery-emulator](https://github.com/goccy/bigquery-emulator) Docker image (`ghcr.io/goccy/bigquery-emulator`).
+- **Why:** Frequently requested. BigQuery is one of the most-used GCP services for data engineers.
+- **Context:** The existing emulator uses ZetaSQL (Google's actual SQL parser) + SQLite. REST API on port 9050. Supports `BIGQUERY_EMULATOR_HOST` env var. Just needs a config entry in `internal/orchestrator/config.go`, same pattern as Spanner.
+- **Effort:** ~5 min (config + CLI wiring). No custom implementation needed.
+- **Depends on:** Nothing. Orchestrator framework already supports this.
