@@ -51,20 +51,18 @@ Fill the gaps that matter most for real-world adoption.
   - Standalone IAM API first (service account CRUD, get/set policies, testIamPermissions)
   - Enforcement middleware behind `--iam` flag second (cross-cutting, touches all services)
 
-## Phase 4 — Complex services (two-tier strategy)
+## Phase 4 — Docker-orchestrated services (done)
 
-Services that ARE databases get a two-tier approach:
-- **Tier 1 (default):** Lightweight custom implementation in the single binary
-- **Tier 2 (opt-in):** Docker container wrapping the official Google emulator for high fidelity
+Lazy Docker orchestrator: localgcp manages official emulator containers behind a TCP proxy.
+Containers start on first connection, not at startup. Opt-in via `--services` flag.
 
-| Service | Tier 1 (custom) | Tier 2 (wrapped) |
-|---------|----------------|-----------------|
-| Spanner | Basic SQL subset | Official emulator via Docker |
-| Bigtable | Key-value operations | Official emulator via Docker |
-| Cloud SQL | — | Postgres/MySQL container |
-| Memorystore | — | Redis container |
-
-Tier 2 is activated with `localgcp up --high-fidelity` or `localgcp up --wrap=spanner,bigtable`.
+- [x] Orchestrator framework (ContainerRuntime interface, lazy TCP proxy, Docker context detection)
+- [x] Spanner (gcr.io/cloud-spanner-emulator/emulator, gRPC :9010)
+- [x] Bigtable (google/cloud-sdk:emulators, gRPC :9094)
+- [x] Cloud SQL (postgres:16-alpine, TCP :5432)
+- [x] Memorystore (redis:7-alpine, TCP :6379)
+- [ ] Data persistence for orchestrated containers (volume mounts)
+- [ ] `localgcp pull` command (pre-fetch images)
 
 ## Distribution milestones
 

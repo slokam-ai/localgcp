@@ -1,6 +1,6 @@
 # localgcp
 
-The first unified GCP emulator. One binary, nine services, zero cloud bills.
+The unified GCP emulator. One binary, thirteen services, zero cloud bills.
 
 **Now with Vertex AI.** Run your `google.golang.org/genai` code against local LLMs via Ollama. Zero code changes, real inference, no API keys.
 
@@ -8,8 +8,8 @@ The first unified GCP emulator. One binary, nine services, zero cloud bills.
 # Install
 brew install slokam-ai/tap/localgcp
 
-# Start (with Ollama for AI)
-localgcp up --vertex-model-map="gemini-2.5-flash=gemma3"
+# Start all native services + Spanner and Bigtable
+localgcp up --services=spanner,bigtable
 
 # Your GCP code works unchanged
 eval $(localgcp env)
@@ -50,7 +50,7 @@ Without Ollama running, localgcp returns deterministic stub responses, perfect f
 
 ## What it does
 
-localgcp emulates nine GCP services locally so you can develop and test without a cloud project, without credentials, and without a bill.
+localgcp emulates thirteen GCP services locally so you can develop and test without a cloud project, without credentials, and without a bill. Nine services run natively in the binary. Four more (Spanner, Bigtable, Cloud SQL, Memorystore) are orchestrated via Docker containers that start lazily on first use.
 
 | Service | Protocol | Port | Env var |
 |---------|----------|------|---------|
@@ -63,6 +63,11 @@ localgcp emulates nine GCP services locally so you can develop and test without 
 | Cloud KMS | gRPC | 8091 | (manual endpoint config) |
 | Cloud Logging | gRPC | 8092 | (manual endpoint config) |
 | Cloud Run | gRPC | 8093 | (manual endpoint config) |
+| **Orchestrated (Docker required)** | | | |
+| Spanner | gRPC | 9010 | `SPANNER_EMULATOR_HOST` |
+| Bigtable | gRPC | 9094 | `BIGTABLE_EMULATOR_HOST` |
+| Cloud SQL (Postgres) | TCP | 5432 | (standard Postgres) |
+| Memorystore (Redis) | TCP | 6379 | (standard Redis) |
 
 ## Quick start
 
@@ -72,7 +77,7 @@ localgcp emulates nine GCP services locally so you can develop and test without 
 localgcp up
 ```
 
-All nine services start in the foreground. Data lives in memory and vanishes when you stop. Press Ctrl+C to stop.
+All native services start in the foreground. Data lives in memory and vanishes when you stop. Press Ctrl+C to stop.
 
 For persistent data across restarts:
 
@@ -174,6 +179,30 @@ Your GCP client libraries work against localgcp with zero code changes (except S
 - Model alias registry: map Vertex model names to local model names (e.g. `gemini-2.5-flash` -> `llama3.2`)
 - Works with the official `google.golang.org/genai` SDK via `HTTPOptions.BaseURL`
 
+### Spanner (orchestrated)
+- Runs the official Google Spanner emulator via Docker
+- Lazy start: container pulls and starts on first connection (~3s cached, ~30s first time)
+- Full Spanner API compatibility via `SPANNER_EMULATOR_HOST=localhost:9010`
+- `localgcp up --services=spanner`
+
+### Bigtable (orchestrated)
+- Runs the official Google Bigtable emulator via Docker
+- Lazy start on first connection
+- Full Bigtable API compatibility via `BIGTABLE_EMULATOR_HOST=localhost:9094`
+- `localgcp up --services=bigtable`
+
+### Cloud SQL (orchestrated)
+- Runs PostgreSQL 16 via Docker
+- Standard Postgres connection: `localhost:5432`, user `postgres`, database `localgcp`
+- Works with any Postgres client/ORM
+- `localgcp up --services=cloudsql`
+
+### Memorystore (orchestrated)
+- Runs Redis 7 via Docker
+- Standard Redis connection: `localhost:6379`
+- Works with any Redis client
+- `localgcp up --services=memorystore`
+
 ### Cloud KMS
 - KeyRing and CryptoKey CRUD
 - Symmetric encrypt/decrypt (ENCRYPT_DECRYPT purpose)
@@ -218,11 +247,17 @@ localgcp --version         Print version
 | `--vertex-model-map` | (defaults) | Model aliases (e.g. `gemini-2.5-flash=llama3.2`) |
 | `--vertex-backend` | `ollama` | Backend provider: `ollama`, `openai`, `anthropic`, `stub` |
 | `--vertex-api-key` | | API key for OpenAI/Anthropic backends |
+| `--services` | | Docker-orchestrated services: `spanner,bigtable,cloudsql,memorystore` |
+| `--no-docker` | false | Skip all Docker-orchestrated services |
+| `--port-spanner` | 9010 | Spanner emulator port |
+| `--port-bigtable` | 9094 | Bigtable emulator port |
+| `--port-cloudsql` | 5432 | Cloud SQL (Postgres) port |
+| `--port-memorystore` | 6379 | Memorystore (Redis) port |
 | `--quiet`, `-q` | false | Suppress request logging |
 
 ## How it works
 
-localgcp is a single Go binary with no runtime dependencies. All nine GCP services are implemented from scratch in Go (no wrapping of Google's official Java-based emulators). Data is stored in memory by default, with optional JSON-file persistence via `--data-dir`.
+localgcp is a single Go binary. Nine services are implemented from scratch in Go with no runtime dependencies. Four additional services (Spanner, Bigtable, Cloud SQL, Memorystore) are orchestrated via Docker containers that start lazily on first use, requiring Docker to be installed. Native service data is stored in memory by default, with optional JSON-file persistence via `--data-dir`. Orchestrated services use ephemeral containers.
 
 GCP client libraries already support `*_EMULATOR_HOST` environment variables. When these are set, the libraries connect to localhost instead of Google Cloud. localgcp uses this mechanism for zero-friction SDK compatibility.
 
@@ -237,6 +272,7 @@ GCP client libraries already support `*_EMULATOR_HOST` environment variables. Wh
 - Cloud KMS: key import, key rotation schedules, raw encrypt/decrypt, asymmetric decrypt
 - Cloud Logging: structured payload queries, log sinks, log-based metrics, streaming tail
 - Cloud Run: container execution, revisions, traffic splitting, domain mapping
+- Orchestrated services: data persistence across restarts, Spanner REST admin API
 - IAM/auth enforcement (all requests are accepted)
 
 See [ROADMAP.md](ROADMAP.md) for what's coming next.

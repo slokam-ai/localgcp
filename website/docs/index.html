@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Getting Started - localgcp docs</title>
-  <meta name="description" content="Install and configure localgcp, the unified GCP emulator. One binary, nine services, zero cloud bills.">
+  <meta name="description" content="Install and configure localgcp, the unified GCP emulator. One binary, thirteen services, zero cloud bills.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -249,11 +249,16 @@
       <a href="/docs/cloud-kms.html" class="sidebar-link">Cloud KMS</a>
       <a href="/docs/cloud-logging.html" class="sidebar-link">Cloud Logging</a>
       <a href="/docs/cloud-run.html" class="sidebar-link">Cloud Run</a>
+      <div class="sidebar-section" style="margin-top:1rem"><div class="sidebar-label">Orchestrated</div></div>
+      <a href="/docs/spanner.html" class="sidebar-link">Spanner</a>
+      <a href="/docs/bigtable.html" class="sidebar-link">Bigtable</a>
+      <a href="/docs/cloud-sql.html" class="sidebar-link">Cloud SQL</a>
+      <a href="/docs/memorystore.html" class="sidebar-link">Memorystore</a>
     </aside>
 
     <main class="content">
       <h1>Getting Started</h1>
-      <div class="subtitle">one binary, nine services, zero cloud bills</div>
+      <div class="subtitle">one binary, thirteen services, zero cloud bills</div>
 
       <h2>Installation</h2>
 
@@ -275,8 +280,20 @@
 
       <h2>Starting the emulator</h2>
 
-      <p>Start all nine services in the foreground:</p>
+      <p>Start all native services in the foreground:</p>
 <pre class="code-block"><span class="prompt">$</span> localgcp up</pre>
+
+      <h3>Adding orchestrated services</h3>
+
+      <p>Four additional services run as Docker containers, opt-in via <code>--services</code>. Requires Docker (Docker Desktop, OrbStack, or Colima).</p>
+
+<pre class="code-block"><span class="comment"># Add Spanner and Bigtable</span>
+<span class="prompt">$</span> localgcp up --services=spanner,bigtable
+
+<span class="comment"># Add all four orchestrated services</span>
+<span class="prompt">$</span> localgcp up --services=spanner,bigtable,cloudsql,memorystore</pre>
+
+      <p>Orchestrated services use <strong>lazy startup</strong>: the port binds instantly, but the Docker container only pulls and starts when your code first connects. If you never use Spanner, the container never starts.</p>
 
       <p>With all available flags:</p>
 <pre class="code-block"><span class="prompt">$</span> localgcp up \
@@ -290,6 +307,7 @@
     --port-kms=8091 \
     --port-logging=8092 \
     --port-cloudrun=8093 \
+    --services=spanner,bigtable,cloudsql,memorystore \
     --ollama-host=http://localhost:11434 \
     --vertex-model-map=<span class="string">"gemini-2.5-flash=gemma3"</span> \
     --quiet</pre>
@@ -390,6 +408,35 @@
             <td><code>8093</code></td>
             <td><code>--port-cloudrun</code></td>
             <td>(manual config)</td>
+          </tr>
+          <tr><td colspan="5" style="color:var(--text-muted); font-size:0.8rem; letter-spacing:1px; padding-top:0.75rem">ORCHESTRATED (Docker required, opt-in via --services)</td></tr>
+          <tr>
+            <td>Spanner</td>
+            <td>gRPC</td>
+            <td><code>9010</code></td>
+            <td><code>--port-spanner</code></td>
+            <td><code>SPANNER_EMULATOR_HOST</code></td>
+          </tr>
+          <tr>
+            <td>Bigtable</td>
+            <td>gRPC</td>
+            <td><code>9094</code></td>
+            <td><code>--port-bigtable</code></td>
+            <td><code>BIGTABLE_EMULATOR_HOST</code></td>
+          </tr>
+          <tr>
+            <td>Cloud SQL</td>
+            <td>TCP</td>
+            <td><code>5432</code></td>
+            <td><code>--port-cloudsql</code></td>
+            <td>(standard Postgres)</td>
+          </tr>
+          <tr>
+            <td>Memorystore</td>
+            <td>TCP</td>
+            <td><code>6379</code></td>
+            <td><code>--port-memorystore</code></td>
+            <td>(standard Redis)</td>
           </tr>
         </tbody>
       </table>

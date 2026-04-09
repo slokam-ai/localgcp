@@ -27,7 +27,7 @@ var version = "dev"
 func main() {
 	root := &cobra.Command{
 		Use:     "localgcp",
-		Short:   "The first unified GCP emulator. One binary, nine services, zero cloud bills.",
+		Short:   "The unified GCP emulator. One binary, thirteen services, zero cloud bills.",
 		Version: version,
 	}
 
