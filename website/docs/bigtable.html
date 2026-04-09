@@ -108,15 +108,20 @@
     .callout { background: var(--saffron-glow); border: 1px solid var(--saffron-dim); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; font-size: 0.875rem; color: var(--text-primary); line-height: 1.6; }
     .callout strong { color: var(--saffron); }
     @media (max-width: 768px) {
+      body { overflow-x: hidden; }
       .menu-toggle { display: block; }
       .sidebar { transform: translateX(-100%); z-index: 99; width: 260px; min-width: 260px; }
       .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.3); }
-      .content { margin-left: 0; padding: 2rem 1.5rem 3rem; }
+      .content { margin-left: 0; padding: 2rem 1.25rem 3rem; max-width: 100%; }
+      pre.code-block { font-size: 0.72rem; white-space: pre-wrap; word-break: break-all; }
     }
     @media (max-width: 480px) {
-      .content { padding: 1.5rem 1rem 2rem; }
-      .content h1 { font-size: 1.75rem; }
-      pre.code-block { font-size: 0.72rem; padding: 0.75rem 1rem; }
+      .content { padding: 1.25rem 0.75rem 2rem; }
+      .content h1 { font-size: 1.5rem; }
+      .content h2 { font-size: 1.2rem; }
+      pre.code-block { font-size: 0.65rem; padding: 0.75rem 0.75rem; }
+      .callout { padding: 0.75rem 1rem; font-size: 0.8rem; }
+      code:not([class]) { font-size: 0.7rem; }
     }
   </style>
 </head>

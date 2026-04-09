@@ -261,18 +261,28 @@
     footer a { color: var(--saffron); }
 
     @media (max-width: 768px) {
-      .services { grid-template-columns: 1fr; }
+      body { overflow-x: hidden; }
+      .services { grid-template-columns: 1fr 1fr; }
       .comp-grid { grid-template-columns: 1fr; gap: 2rem; }
       .hero { padding: 4rem 0 3rem; }
       section { padding: 3.5rem 0; }
       .comparison { padding: 1.5rem; }
       .nav-right { gap: 1rem; }
       .nav-link { font-size: 0.8rem; }
+      .terminal-body { font-size: 0.65rem; padding: 1rem; white-space: pre-wrap; word-break: break-all; }
+      .step code { font-size: 0.7rem; white-space: pre-wrap; word-break: break-all; }
+      .hero-highlight { padding: 1rem 1.25rem; }
     }
     @media (max-width: 480px) {
       h1 { font-size: 1.75rem; }
       h2 { font-size: 1.25rem; }
-      .container { padding: 0 1.25rem; }
+      .container { padding: 0 1rem; }
+      .services { grid-template-columns: 1fr; }
+      .terminal-body { font-size: 0.6rem; line-height: 1.7; }
+      .step { grid-template-columns: 2rem 1fr; }
+      .step code { font-size: 0.65rem; }
+      .hero-terminal { max-width: 100%; }
+      .cta-install { display: block; margin-top: 0.75rem; }
     }
   </style>
 </head>
