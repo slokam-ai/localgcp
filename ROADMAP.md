@@ -43,8 +43,13 @@ Fill the gaps that matter most for real-world adoption.
 
 - [ ] Cloud KMS (sign, verify, encrypt/decrypt with in-memory keys)
 - [ ] Cloud Logging (log ingestion and query)
-- [ ] IAM (roles, permissions, service accounts) — opt-in enforcement
 - [ ] Cloud Run (container execution)
+
+## Phase 3b — IAM (deferred, needs design)
+
+- [ ] IAM (roles, permissions, service accounts) — opt-in enforcement
+  - Standalone IAM API first (service account CRUD, get/set policies, testIamPermissions)
+  - Enforcement middleware behind `--iam` flag second (cross-cutting, touches all services)
 
 ## Phase 4 — Complex services (two-tier strategy)
 
