@@ -44,14 +44,18 @@ changelog:
       - "^ci:"
       - "^test:"
 
-homebrew_casks:
+brews:
   - repository:
       owner: slokam-ai
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://localgcp.com
-    description: "The first unified GCP emulator. One binary, five services, zero cloud bills."
+    description: "The unified GCP emulator. One binary, thirteen services, zero cloud bills."
     license: MIT
+    install: |
+      bin.install "localgcp"
+    test: |
+      system bin/"localgcp", "--version"
 
 dockers_v2:
   - images:
