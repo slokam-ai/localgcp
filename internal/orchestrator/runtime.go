@@ -5,6 +5,8 @@ package orchestrator
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -50,21 +52,118 @@ type DockerRuntime struct {
 }
 
 // NewDockerRuntime creates a Docker runtime. If Docker is unavailable, Available() returns false.
+// Tries DOCKER_HOST env, then the active Docker context endpoint, then common socket paths.
 func NewDockerRuntime(logger *log.Logger) *DockerRuntime {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	// Strategy: try multiple Docker host candidates until one responds to Ping.
+	candidates := dockerHostCandidates()
+
+	for _, host := range candidates {
+		var opts []client.Opt
+		if host == "" {
+			opts = []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
+		} else {
+			opts = []client.Opt{client.WithHost(host), client.WithAPIVersionNegotiation()}
+		}
+
+		cli, err := client.NewClientWithOpts(opts...)
+		if err != nil {
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_, err = cli.Ping(ctx)
+		cancel()
+		if err == nil {
+			if host != "" {
+				logger.Printf("Docker available via %s", host)
+			} else {
+				logger.Printf("Docker available")
+			}
+			return &DockerRuntime{cli: cli, logger: logger, avail: true}
+		}
+	}
+
+	logger.Printf("Docker not available (tried %d endpoints)", len(candidates))
+	return &DockerRuntime{logger: logger}
+}
+
+// dockerHostCandidates returns Docker host URIs to try, in order of preference.
+func dockerHostCandidates() []string {
+	var candidates []string
+
+	// 1. DOCKER_HOST env / default socket (via client.FromEnv).
+	candidates = append(candidates, "")
+
+	// 2. Active Docker context endpoint (supports OrbStack, Colima, Rancher, etc).
+	if endpoint := activeDockerContextEndpoint(); endpoint != "" {
+		candidates = append(candidates, endpoint)
+	}
+
+	// 3. Common alternative socket paths.
+	// Note: some runtimes (OrbStack) create virtual sockets that don't appear
+	// on disk via stat but respond to connections. We try connecting, not stat.
+	home, _ := os.UserHomeDir()
+	for _, path := range []string{
+		home + "/.orbstack/run/docker.sock",
+		home + "/.colima/default/docker.sock",
+		home + "/.docker/run/docker.sock",
+		"/run/docker.sock",
+	} {
+		candidates = append(candidates, "unix://"+path)
+	}
+
+	return candidates
+}
+
+// activeDockerContextEndpoint reads the active Docker context's endpoint.
+// This handles OrbStack, Colima, Rancher Desktop, etc. that register as Docker contexts.
+func activeDockerContextEndpoint() string {
+	home, err := os.UserHomeDir()
 	if err != nil {
-		logger.Printf("Docker SDK init failed: %v", err)
-		return &DockerRuntime{logger: logger}
+		return ""
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if _, err := cli.Ping(ctx); err != nil {
-		logger.Printf("Docker not available: %v", err)
-		return &DockerRuntime{cli: cli, logger: logger}
+	// Read the active context name from ~/.docker/config.json.
+	configPath := home + "/.docker/config.json"
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return ""
 	}
 
-	return &DockerRuntime{cli: cli, logger: logger, avail: true}
+	// Quick JSON parse for currentContext field.
+	type dockerConfig struct {
+		CurrentContext string `json:"currentContext"`
+	}
+	var cfg dockerConfig
+	if err := json.Unmarshal(data, &cfg); err != nil || cfg.CurrentContext == "" || cfg.CurrentContext == "default" {
+		return ""
+	}
+
+	// Hash the context name to find its metadata directory.
+	// Docker uses SHA256 of the context name for the directory.
+	h := sha256.Sum256([]byte(cfg.CurrentContext))
+	metaDir := fmt.Sprintf("%s/.docker/contexts/meta/%x/meta.json", home, h)
+
+	metaData, err := os.ReadFile(metaDir)
+	if err != nil {
+		return ""
+	}
+
+	// Parse the endpoint host from the context metadata.
+	type contextMeta struct {
+		Endpoints map[string]struct {
+			Host string `json:"Host"`
+		} `json:"Endpoints"`
+	}
+	var meta contextMeta
+	if err := json.Unmarshal(metaData, &meta); err != nil {
+		return ""
+	}
+
+	if docker, ok := meta.Endpoints["docker"]; ok && docker.Host != "" {
+		return docker.Host
+	}
+	return ""
 }
 
 func (d *DockerRuntime) Available() bool { return d.avail }
@@ -120,7 +219,7 @@ func (d *DockerRuntime) Start(ctx context.Context, id string) error {
 }
 
 func (d *DockerRuntime) Stop(ctx context.Context, id string) error {
-	timeout := 10
+	timeout := 2
 	return d.cli.ContainerStop(ctx, id, container.StopOptions{Timeout: &timeout})
 }
 

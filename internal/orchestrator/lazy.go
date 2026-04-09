@@ -195,7 +195,7 @@ func (s *LazyService) shutdown() {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 
 	s.logger.Printf("Stopping container %s", s.config.Name)

@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
-
-	"strings"
 
 	"github.com/slokam-ai/localgcp/internal/auth"
 	"github.com/slokam-ai/localgcp/internal/cloudrun"
@@ -66,7 +66,7 @@ func upCmd() *cobra.Command {
 
 			// Register orchestrated Docker services (opt-in via --services).
 			if cfg.Services != "" && !cfg.NoDocker {
-				runtime := orchestrator.NewDockerRuntime(nil)
+				runtime := orchestrator.NewDockerRuntime(log.New(os.Stderr, "[orchestrator] ", log.LstdFlags))
 				if !runtime.Available() {
 					fmt.Fprintln(os.Stderr, "Warning: Docker not available; skipping orchestrated services")
 				} else {
