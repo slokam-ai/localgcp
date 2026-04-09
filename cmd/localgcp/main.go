@@ -33,6 +33,7 @@ func main() {
 
 	root.AddCommand(upCmd())
 	root.AddCommand(envCmd())
+	root.AddCommand(pullCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -90,6 +91,7 @@ func upCmd() *cobra.Command {
 						if !ok {
 							return fmt.Errorf("no port configured for %s", svcName)
 						}
+						ecfg = orchestrator.WithDataDir(ecfg, cfg.DataDir)
 						srv.Register(orchestrator.NewLazyService(ecfg.Name, ecfg, runtime), port)
 					}
 				}
@@ -202,5 +204,47 @@ func envCmd() *cobra.Command {
 	cmd.Flags().IntVar(&portLogging, "port-logging", cfg.PortLogging, "Port for Cloud Logging")
 	cmd.Flags().IntVar(&portCloudRun, "port-cloudrun", cfg.PortCloudRun, "Port for Cloud Run")
 
+	return cmd
+}
+
+func pullCmd() *cobra.Command {
+	var services string
+
+	cmd := &cobra.Command{
+		Use:   "pull",
+		Short: "Pre-fetch Docker images for orchestrated services",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			runtime := orchestrator.NewDockerRuntime(log.New(os.Stderr, "[pull] ", log.LstdFlags))
+			if !runtime.Available() {
+				return fmt.Errorf("Docker is not available. Install Docker Desktop, OrbStack, or Colima to use orchestrated services")
+			}
+
+			var targets []string
+			if services == "" {
+				// Pull all by default.
+				for name := range orchestrator.ServiceRegistry {
+					targets = append(targets, name)
+				}
+			} else {
+				targets = strings.Split(services, ",")
+			}
+
+			for _, name := range targets {
+				name = strings.TrimSpace(name)
+				cfg, ok := orchestrator.ServiceRegistry[name]
+				if !ok {
+					fmt.Fprintf(os.Stderr, "Warning: unknown service %q, skipping\n", name)
+					continue
+				}
+				if err := runtime.Pull(cmd.Context(), cfg.Image); err != nil {
+					fmt.Fprintf(os.Stderr, "Error pulling %s: %v\n", name, err)
+				}
+			}
+			fmt.Println("All images pulled. First-request latency is now ~3s (container start only).")
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&services, "services", "", "Services to pull (default: all). Example: spanner,bigtable")
 	return cmd
 }
