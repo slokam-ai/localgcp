@@ -4,3 +4,4 @@ dist/
 .localgcp/
 *.exe
 .claude/
+.omx/
