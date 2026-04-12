@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloud SQL - localgcp docs</title>
-  <meta name="description" content="Use Cloud SQL (PostgreSQL) locally via localgcp's Docker orchestrator. Lazy startup, zero config.">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">  <link rel="canonical" href="https://localgcp.com/docs/cloud-sql.html">  <meta property="og:title" content="Cloud SQL - localgcp docs">  <meta property="og:description" content="Run Cloud SQL PostgreSQL locally via Docker orchestration">  <meta property="og:type" content="article">  <meta property="og:url" content="https://localgcp.com/docs/cloud-sql.html">  <meta name="twitter:card" content="summary">  <meta name="twitter:title" content="Cloud SQL - localgcp docs">  <meta name="twitter:description" content="Run Cloud SQL PostgreSQL locally via Docker orchestration">
+  <title>BigQuery - localgcp docs</title>
+  <meta name="description" content="Use BigQuery locally via localgcp's Docker orchestrator. DuckDB-powered columnar engine, zero config.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">  <link rel="canonical" href="https://localgcp.com/docs/bigquery.html">  <meta property="og:title" content="BigQuery - localgcp docs">  <meta property="og:description" content="Run BigQuery locally with DuckDB-powered columnar engine">  <meta property="og:type" content="article">  <meta property="og:url" content="https://localgcp.com/docs/bigquery.html">  <meta name="twitter:card" content="summary">  <meta name="twitter:title" content="BigQuery - localgcp docs">  <meta name="twitter:description" content="Run BigQuery locally with DuckDB-powered columnar engine">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -161,94 +161,195 @@
       <div class="sidebar-section" style="margin-top:1rem"><div class="sidebar-label">Orchestrated</div></div>
       <a href="/docs/spanner.html" class="sidebar-link">Spanner</a>
       <a href="/docs/bigtable.html" class="sidebar-link">Bigtable</a>
-      <a href="/docs/cloud-sql.html" class="sidebar-link active">Cloud SQL</a>
+      <a href="/docs/cloud-sql.html" class="sidebar-link">Cloud SQL</a>
       <a href="/docs/memorystore.html" class="sidebar-link">Memorystore</a>
-      <a href="/docs/bigquery.html" class="sidebar-link">BigQuery</a>
+      <a href="/docs/bigquery.html" class="sidebar-link active">BigQuery</a>
     </aside>
 
     <main class="content">
-      <h1>Cloud SQL</h1>
-      <div class="subtitle">TCP &middot; port 5432 &middot; orchestrated</div>
+      <h1>BigQuery</h1>
+      <div class="subtitle">REST &middot; port 9060 &middot; orchestrated</div>
 
       <div class="callout">
-        <strong>Orchestrated service.</strong> Cloud SQL runs as a PostgreSQL 16 container managed by localgcp. Requires Docker. Container starts lazily on first connection.
+        <strong>Orchestrated service.</strong> BigQuery runs as a Docker container (LocalBQ) managed by localgcp. Requires Docker. DuckDB-powered -- columnar, vectorized, Parquet/CSV native. The container starts lazily on first connection.
       </div>
 
       <h2>Quick start</h2>
 
-<pre class="code-block"><span class="prompt">$</span> localgcp up --services=cloudsql</pre>
+<pre class="code-block"><span class="prompt">$</span> localgcp up --services=bigquery</pre>
 
-      <h2>Connecting</h2>
+      <p>First connection pulls <code>ghcr.io/slokam-ai/localbq</code>, starts the container (~3s cached).</p>
 
-      <p>Cloud SQL exposes a standard PostgreSQL connection on <code>localhost:5432</code> with trust authentication (no password required). Connect with any Postgres client or driver:</p>
+      <h2>Connect with bq CLI</h2>
 
-<pre class="code-block"><span class="prompt">$</span> psql -h localhost -p 5432 -U postgres -d localgcp</pre>
+      <p>One env var, no code changes. Works with your existing <code>bq</code> installation:</p>
 
-      <p>Works with <code>psql</code>, pgAdmin, DBeaver, or any PostgreSQL client library.</p>
+<pre class="code-block"><span class="prompt">$</span> <span class="keyword">export</span> CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGQUERY=<span class="string">http://localhost:9060/</span>
+<span class="prompt">$</span> bq --project_id=my-project query --use_legacy_sql=false <span class="string">'SELECT 1 + 1 AS result'</span></pre>
 
-      <h2>Go example</h2>
+<pre class="code-block">+--------+
+| result |
++--------+
+|      2 |
++--------+</pre>
 
-      <p>Connect with <code>database/sql</code> and <code>lib/pq</code> or <code>pgx</code>:</p>
+      <h2>Connect with Python</h2>
+
+<pre class="code-block"><span class="keyword">from</span> google.cloud <span class="keyword">import</span> bigquery
+<span class="keyword">from</span> google.auth.credentials <span class="keyword">import</span> AnonymousCredentials
+
+client = bigquery.<span class="func">Client</span>(
+    project=<span class="string">"my-project"</span>,
+    credentials=<span class="func">AnonymousCredentials</span>(),
+    client_options={<span class="string">"api_endpoint"</span>: <span class="string">"http://localhost:9060"</span>},
+)
+
+rows = client.<span class="func">query</span>(<span class="string">"SELECT 1 + 1 AS result"</span>).<span class="func">result</span>()
+<span class="keyword">for</span> row <span class="keyword">in</span> rows:
+    <span class="func">print</span>(row.result)  <span class="comment"># 2</span></pre>
+
+      <h2>Connect with Go</h2>
 
 <pre class="code-block"><span class="keyword">package</span> main
 
 <span class="keyword">import</span> (
-    <span class="string">"database/sql"</span>
+    <span class="string">"context"</span>
     <span class="string">"fmt"</span>
     <span class="string">"log"</span>
 
-    _ <span class="string">"github.com/lib/pq"</span>
+    <span class="string">"cloud.google.com/go/bigquery"</span>
+    <span class="string">"google.golang.org/api/iterator"</span>
+    <span class="string">"google.golang.org/api/option"</span>
 )
 
 <span class="keyword">func</span> <span class="func">main</span>() {
-    db, err := sql.<span class="func">Open</span>(<span class="string">"postgres"</span>,
-        <span class="string">"host=localhost port=5432 user=postgres dbname=localgcp sslmode=disable"</span>,
+    ctx := context.<span class="func">Background</span>()
+
+    client, err := bigquery.<span class="func">NewClient</span>(ctx, <span class="string">"my-project"</span>,
+        option.<span class="func">WithEndpoint</span>(<span class="string">"http://localhost:9060"</span>),
+        option.<span class="func">WithoutAuthentication</span>(),
     )
     <span class="keyword">if</span> err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
-    <span class="keyword">defer</span> db.<span class="func">Close</span>()
+    <span class="keyword">defer</span> client.<span class="func">Close</span>()
 
-    <span class="keyword">if</span> err := db.<span class="func">Ping</span>(); err != <span class="keyword">nil</span> {
+    q := client.<span class="func">Query</span>(<span class="string">"SELECT 1 + 1 AS result"</span>)
+    it, err := q.<span class="func">Read</span>(ctx)
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
         log.<span class="func">Fatal</span>(err)
     }
-    fmt.<span class="func">Println</span>(<span class="string">"connected to Cloud SQL (localgcp)"</span>)
+
+    <span class="keyword">for</span> {
+        <span class="keyword">var</span> row []bigquery.Value
+        err := it.<span class="func">Next</span>(&amp;row)
+        <span class="keyword">if</span> err == iterator.Done {
+            <span class="keyword">break</span>
+        }
+        <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+            log.<span class="func">Fatal</span>(err)
+        }
+        fmt.<span class="func">Println</span>(row) <span class="comment">// [2]</span>
+    }
 }</pre>
 
-      <h2>Python example</h2>
+      <h2>Load data</h2>
 
-      <p>Connect with <code>psycopg2</code>:</p>
+      <p>Load files directly with the CLI:</p>
 
-<pre class="code-block"><span class="keyword">import</span> psycopg2
+<pre class="code-block"><span class="prompt">$</span> localbq load mydata.users users.parquet</pre>
 
-conn = psycopg2.<span class="func">connect</span>(
-    host=<span class="string">"localhost"</span>,
-    port=<span class="string">5432</span>,
-    user=<span class="string">"postgres"</span>,
-    dbname=<span class="string">"localgcp"</span>,
-)
+      <p>Or via SQL:</p>
 
-cur = conn.<span class="func">cursor</span>()
-cur.<span class="func">execute</span>(<span class="string">"SELECT 1"</span>)
-<span class="keyword">print</span>(cur.<span class="func">fetchone</span>())
+<pre class="code-block"><span class="keyword">LOAD DATA INTO</span> mydata.users <span class="keyword">FROM</span> <span class="string">'/path/to/users.parquet'</span></pre>
 
-conn.<span class="func">close</span>()</pre>
+      <p>Supported formats: <strong>Parquet</strong>, <strong>CSV</strong>, <strong>TSV</strong>, <strong>JSON</strong>, <strong>NDJSON</strong>.</p>
 
-      <h2>How it works</h2>
+      <p>If the table doesn't exist, it is created from the file schema. If it already exists, data is appended.</p>
+
+      <h2>Data directory</h2>
 
       <ul>
-        <li><strong>Lazy TCP proxy</strong> -- localgcp listens on port 5432 and starts the PostgreSQL container on first connection</li>
-        <li><strong>postgres:16-alpine</strong> -- lightweight PostgreSQL 16 image pulled automatically</li>
-        <li><strong>Trust authentication</strong> -- no password required, connections are accepted from localhost</li>
-        <li><strong>Database pre-created</strong> -- the <code>localgcp</code> database is created automatically on startup</li>
+        <li><strong>Standalone:</strong> <code>~/.localbq/localbq.duckdb</code></li>
+        <li><strong>Via localgcp:</strong> <code>{data-dir}/localgcp-bigquery</code></li>
+        <li>Override with <code>--data-dir</code> for standalone mode</li>
+        <li>Each data directory is an independent environment</li>
+        <li>Data persists across restarts</li>
       </ul>
+
+      <h2>Switching to production</h2>
+
+      <p>For <code>bq</code> CLI, unset the endpoint override:</p>
+
+<pre class="code-block"><span class="prompt">$</span> <span class="keyword">unset</span> CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGQUERY</pre>
+
+      <p>For Python, use an env var check to switch endpoints:</p>
+
+<pre class="code-block"><span class="keyword">import</span> os
+
+endpoint = os.environ.<span class="func">get</span>(<span class="string">"LOCALBQ_ENDPOINT"</span>)
+<span class="keyword">if</span> endpoint:
+    client = bigquery.<span class="func">Client</span>(
+        project=<span class="string">"my-project"</span>,
+        credentials=<span class="func">AnonymousCredentials</span>(),
+        client_options={<span class="string">"api_endpoint"</span>: endpoint},
+    )
+<span class="keyword">else</span>:
+    client = bigquery.<span class="func">Client</span>(project=<span class="string">"my-project"</span>)</pre>
+
+      <p>One-line switch, no config files.</p>
+
+      <h2>GoogleSQL compatibility</h2>
+
+      <p>LocalBQ includes a text-based lowering pass that translates GoogleSQL to DuckDB SQL. Supported patterns:</p>
+
+      <ul>
+        <li><code>TIMESTAMP_SUB</code>, <code>TIMESTAMP_ADD</code>, <code>TIMESTAMP_TRUNC</code></li>
+        <li><code>DATE</code>, <code>DATE_SUB</code>, <code>DATE_ADD</code>, <code>DATE_TRUNC</code>, <code>DATE_DIFF</code></li>
+        <li><code>COUNTIF</code></li>
+        <li><code>SAFE_CAST</code></li>
+        <li><code>FLOAT64</code>, <code>BOOL</code> type aliases</li>
+        <li>Backtick-quoted identifiers (<code>`project.dataset.table`</code>)</li>
+        <li><code>INFORMATION_SCHEMA</code> regional prefix stripping</li>
+        <li><code>LOAD DATA</code></li>
+      </ul>
+
+      <p>Standard SQL -- joins, CTEs, window functions, aggregations -- works natively through DuckDB.</p>
+
+      <h2>Standalone mode</h2>
+
+      <p>BigQuery is also available as a standalone binary without LocalGCP.</p>
+
+      <h3>Docker</h3>
+
+<pre class="code-block"><span class="prompt">$</span> docker run -p 9060:9060 ghcr.io/slokam-ai/localbq:latest</pre>
+
+      <h3>From source</h3>
+
+<pre class="code-block"><span class="prompt">$</span> go install github.com/slokam-ai/localbq/cmd/localbq@latest</pre>
+
+      <h3>Usage</h3>
+
+<pre class="code-block"><span class="prompt">$</span> localbq up           <span class="comment"># start in foreground</span>
+<span class="prompt">$</span> localbq up -d        <span class="comment"># start in background</span>
+<span class="prompt">$</span> localbq stop         <span class="comment"># stop background server</span>
+<span class="prompt">$</span> localbq status       <span class="comment"># check if running</span></pre>
+
+      <p>Source and issues: <a href="https://github.com/slokam-ai/localbq">github.com/slokam-ai/localbq</a></p>
 
       <h2>Not yet supported</h2>
 
       <ul>
-        <li>Data persistence across restarts</li>
-        <li>Multiple databases</li>
-        <li>Cloud SQL Auth Proxy compatibility</li>
+        <li>MERGE with WHEN NOT MATCHED BY SOURCE</li>
+        <li>QUALIFY clause</li>
+        <li>PIVOT / UNPIVOT</li>
+        <li>SELECT AS STRUCT, SELECT AS VALUE</li>
+        <li>Complex UNNEST with explicit joins</li>
+        <li>Scripting (DECLARE, stored procedures, JS UDFs)</li>
+        <li>GEOGRAPHY type (WGS84 geodesic)</li>
+        <li>BIGNUMERIC beyond 38 digits</li>
+        <li>Storage Read/Write API (gRPC)</li>
+        <li>BigQuery ML / BI Engine</li>
       </ul>
 
     </main>
