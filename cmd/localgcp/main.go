@@ -80,12 +80,13 @@ func upCmd() *cobra.Command {
 						"bigtable":    cfg.PortBigtable,
 						"cloudsql":    cfg.PortCloudSQL,
 						"memorystore": cfg.PortMemorystore,
+						"bigquery":    cfg.PortBigQuery,
 					}
 					for _, svcName := range requested {
 						svcName = strings.TrimSpace(svcName)
 						ecfg, ok := orchestrator.ServiceRegistry[svcName]
 						if !ok {
-							return fmt.Errorf("unknown orchestrated service: %s (available: spanner, bigtable, cloudsql, memorystore)", svcName)
+							return fmt.Errorf("unknown orchestrated service: %s (available: spanner, bigtable, cloudsql, memorystore, bigquery)", svcName)
 						}
 						port, ok := portMap[svcName]
 						if !ok {
@@ -115,19 +116,20 @@ func upCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.VertexModelMap, "vertex-model-map", "", "Model alias mapping (e.g. gemini-2.5-flash=llama3.2)")
 	cmd.Flags().StringVar(&cfg.VertexBackend, "vertex-backend", "", "Vertex AI backend: ollama (default), openai, anthropic, stub")
 	cmd.Flags().StringVar(&cfg.VertexAPIKey, "vertex-api-key", "", "API key for OpenAI/Anthropic Vertex AI backends")
-	cmd.Flags().StringVar(&cfg.Services, "services", "", "Docker-orchestrated services: spanner,bigtable,cloudsql,memorystore")
+	cmd.Flags().StringVar(&cfg.Services, "services", "", "Docker-orchestrated services: spanner,bigtable,cloudsql,memorystore,bigquery")
 	cmd.Flags().BoolVar(&cfg.NoDocker, "no-docker", false, "Skip all Docker-orchestrated services")
 	cmd.Flags().IntVar(&cfg.PortSpanner, "port-spanner", cfg.PortSpanner, "Port for Spanner emulator")
 	cmd.Flags().IntVar(&cfg.PortBigtable, "port-bigtable", cfg.PortBigtable, "Port for Bigtable emulator")
 	cmd.Flags().IntVar(&cfg.PortCloudSQL, "port-cloudsql", cfg.PortCloudSQL, "Port for Cloud SQL (Postgres)")
 	cmd.Flags().IntVar(&cfg.PortMemorystore, "port-memorystore", cfg.PortMemorystore, "Port for Memorystore (Redis)")
+	cmd.Flags().IntVar(&cfg.PortBigQuery, "port-bigquery", cfg.PortBigQuery, "Port for BigQuery (LocalBQ)")
 	cmd.Flags().BoolVarP(&cfg.Quiet, "quiet", "q", false, "Suppress request logging (for CI)")
 
 	return cmd
 }
 
 func envCmd() *cobra.Command {
-	var portGCS, portPubSub, portFirestore, portSecretManager, portCloudTasks, portVertexAI, portKMS, portLogging, portCloudRun int
+	var portGCS, portPubSub, portFirestore, portSecretManager, portCloudTasks, portVertexAI, portKMS, portLogging, portCloudRun, portBigQuery int
 
 	cmd := &cobra.Command{
 		Use:   "env",
@@ -188,6 +190,14 @@ func envCmd() *cobra.Command {
 			fmt.Println("#     option.WithoutAuthentication(),")
 			fmt.Println("#     option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),")
 			fmt.Println("#   )")
+			fmt.Println("#")
+			fmt.Println("# BigQuery (bq CLI):")
+			fmt.Printf("#   export CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGQUERY=http://localhost:%d/\n", portBigQuery)
+			fmt.Println("#")
+			fmt.Println("# BigQuery (Python):")
+			fmt.Println("#   from google.auth.credentials import AnonymousCredentials")
+			fmt.Println("#   client = bigquery.Client(credentials=AnonymousCredentials(),")
+			fmt.Printf("#     client_options={\"api_endpoint\": \"http://localhost:%d\"})\n", portBigQuery)
 
 			return nil
 		},
@@ -203,6 +213,7 @@ func envCmd() *cobra.Command {
 	cmd.Flags().IntVar(&portKMS, "port-kms", cfg.PortKMS, "Port for Cloud KMS")
 	cmd.Flags().IntVar(&portLogging, "port-logging", cfg.PortLogging, "Port for Cloud Logging")
 	cmd.Flags().IntVar(&portCloudRun, "port-cloudrun", cfg.PortCloudRun, "Port for Cloud Run")
+	cmd.Flags().IntVar(&portBigQuery, "port-bigquery", cfg.PortBigQuery, "Port for BigQuery (LocalBQ)")
 
 	return cmd
 }

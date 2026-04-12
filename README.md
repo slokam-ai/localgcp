@@ -1,6 +1,6 @@
 # localgcp
 
-The unified GCP emulator. One binary, thirteen services, zero cloud bills.
+The unified GCP emulator. One binary, fourteen services, zero cloud bills.
 
 **Now with Vertex AI.** Run your `google.golang.org/genai` code against local LLMs via Ollama. Zero code changes, real inference, no API keys.
 
@@ -50,7 +50,7 @@ Without Ollama running, localgcp returns deterministic stub responses, perfect f
 
 ## What it does
 
-localgcp emulates thirteen GCP services locally so you can develop and test without a cloud project, without credentials, and without a bill. Nine services run natively in the binary. Four more (Spanner, Bigtable, Cloud SQL, Memorystore) are orchestrated via Docker containers that start lazily on first use.
+localgcp emulates thirteen GCP services locally so you can develop and test without a cloud project, without credentials, and without a bill. Nine services run natively in the binary. Five more (Spanner, Bigtable, Cloud SQL, Memorystore, BigQuery) are orchestrated via Docker containers that start lazily on first use.
 
 | Service | Protocol | Port | Env var |
 |---------|----------|------|---------|
@@ -68,6 +68,7 @@ localgcp emulates thirteen GCP services locally so you can develop and test with
 | Bigtable | gRPC | 9094 | `BIGTABLE_EMULATOR_HOST` |
 | Cloud SQL (Postgres) | TCP | 5432 | (standard Postgres) |
 | Memorystore (Redis) | TCP | 6379 | (standard Redis) |
+| BigQuery ([LocalBQ](https://github.com/slokam-ai/localbq)) | REST | 9060 | `CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGQUERY` |
 
 ## Quick start
 
@@ -337,7 +338,7 @@ localgcp builds on the shoulders of excellent standalone emulators:
 - [fsouza/fake-gcs-server](https://github.com/fsouza/fake-gcs-server) — GCS emulator with broad API coverage
 - [aertje/cloud-tasks-emulator](https://github.com/aertje/cloud-tasks-emulator) — Cloud Tasks emulator with App Engine support
 
-localgcp's differentiator is the **unified single-binary** approach: one process, thirteen services, zero configuration. If you only need one service and want deeper API coverage, these standalone projects are great choices.
+localgcp's differentiator is the **unified single-binary** approach: one process, fourteen services, zero configuration. If you only need one service and want deeper API coverage, these standalone projects are great choices.
 
 ## Contributing
 
