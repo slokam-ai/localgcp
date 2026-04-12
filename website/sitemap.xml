@@ -15,4 +15,5 @@
   <url><loc>https://localgcp.com/docs/bigtable.html</loc><priority>0.8</priority></url>
   <url><loc>https://localgcp.com/docs/cloud-sql.html</loc><priority>0.8</priority></url>
   <url><loc>https://localgcp.com/docs/memorystore.html</loc><priority>0.8</priority></url>
+  <url><loc>https://localgcp.com/docs/bigquery.html</loc><priority>0.8</priority></url>
 </urlset>

@@ -1,6 +1,6 @@
 # localgcp
 
-> The unified GCP emulator. One binary, thirteen services, zero cloud bills.
+> The unified GCP emulator. One binary, fourteen services, zero cloud bills.
 
 localgcp is an open source Go binary that emulates Google Cloud Platform services locally for development and testing. It replaces fragmented emulator setups with a single command.
 
@@ -17,11 +17,12 @@ Nine services are implemented natively in Go (zero dependencies):
 - Cloud Logging (gRPC, port 8092)
 - Cloud Run (gRPC, port 8093)
 
-Four services are orchestrated via Docker containers (opt-in, lazy startup):
+Five services are orchestrated via Docker containers (opt-in, lazy startup):
 - Spanner (gRPC, port 9010) — official Google emulator
 - Bigtable (gRPC, port 9094) — official Google emulator
 - Cloud SQL (TCP, port 5432) — PostgreSQL 16
 - Memorystore (TCP, port 6379) — Redis 7
+- BigQuery (REST, port 9060) — DuckDB-powered emulator (LocalBQ)
 
 ## Quick Start
 

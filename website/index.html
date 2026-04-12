@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>localgcp - The unified GCP emulator</title>
-  <meta name="description" content="One binary, thirteen services, zero cloud bills. Emulate Spanner, Firestore, Pub/Sub, Vertex AI, Cloud Storage, KMS, and more locally.">
+  <meta name="description" content="One binary, fourteen services, zero cloud bills. Emulate Spanner, Firestore, Pub/Sub, Vertex AI, Cloud Storage, KMS, and more locally.">
   <meta property="og:title" content="localgcp - The unified GCP emulator">
-  <meta property="og:description" content="One binary, thirteen services, zero cloud bills. Nine native Go services plus Spanner, Bigtable, Cloud SQL, and Redis via Docker.">
+  <meta property="og:description" content="One binary, fourteen services, zero cloud bills. Nine native Go services plus Spanner, Bigtable, Cloud SQL, Redis, and BigQuery via Docker.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://localgcp.com">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -16,7 +16,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "localgcp",
-    "description": "The unified GCP emulator. Thirteen services, one binary, zero cloud bills. Nine native Go services plus Spanner, Bigtable, Cloud SQL, and Redis via Docker orchestration.",
+    "description": "The unified GCP emulator. Fourteen services, one binary, zero cloud bills. Nine native Go services plus Spanner, Bigtable, Cloud SQL, Redis, and BigQuery via Docker orchestration.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux, Windows",
     "url": "https://localgcp.com",
@@ -339,7 +339,7 @@
         <h1>localgcp</h1>
         <div class="hero-tagline">{ the unified GCP emulator }</div>
         <p class="hero-desc">
-          One binary, thirteen services, zero cloud bills.
+          One binary, fourteen services, zero cloud bills.
           Nine native Go services start in under 100ms. Four more via Docker, on demand.
         </p>
         <div class="hero-highlight">
@@ -372,7 +372,7 @@
 
       <section>
         <div class="section-label">What you get</div>
-        <h2>Thirteen services. One command.</h2>
+        <h2>Fourteen services. One command.</h2>
         <p>
           Your GCP client libraries already support emulator host env vars.
           Point them at localhost and your existing code works with zero changes.
@@ -489,6 +489,15 @@
               Works with any Redis client.
             </p>
           </div>
+          <div class="service">
+            <span class="service-badge badge-ai">Docker</span>
+            <div class="service-name">BigQuery</div>
+            <div class="service-proto">REST &middot; :9060</div>
+            <p class="service-desc">
+              DuckDB-powered BigQuery emulator. Same REST API, same SQL.
+              Works with bq CLI, Python SDK, Go SDK.
+            </p>
+          </div>
           <div class="service" style="opacity:0.35; border-style:dashed;">
             <div class="service-name">More coming</div>
             <div class="service-proto" style="visibility:hidden">&nbsp;</div>
@@ -585,7 +594,7 @@
 
       <section class="cta">
         <h2>Start building locally</h2>
-        <p>Thirteen services. 170+ tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
+        <p>Fourteen services. 170+ tests. MIT licensed. Works with Go, Python, Java, Node.js.</p>
         <a href="https://github.com/slokam-ai/localgcp" class="cta-btn">View on GitHub</a>
         <span class="cta-install">
           or: <a href="/docs/">read the docs</a> &middot;

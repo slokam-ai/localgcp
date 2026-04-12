@@ -35,6 +35,7 @@ type Config struct {
 	PortBigtable      int
 	PortCloudSQL      int
 	PortMemorystore   int
+	PortBigQuery      int
 }
 
 // DefaultConfig returns the default server configuration.
@@ -53,6 +54,7 @@ func DefaultConfig() Config {
 		PortBigtable:      9094,
 		PortCloudSQL:      5432,
 		PortMemorystore:   6379,
+		PortBigQuery:      9060,
 		OllamaHost:        "http://localhost:11434",
 	}
 }

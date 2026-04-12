@@ -37,6 +37,14 @@ var (
 		DataPath:     "/data", // Redis data directory
 		Cmd:          nil,     // default cmd; overridden with appendonly when persisting
 	}
+
+	BigQueryConfig = ContainerConfig{
+		Name:         "localgcp-bigquery",
+		Image:        "ghcr.io/slokam-ai/localbq:latest",
+		InternalPort: "9060/tcp",
+		Cmd:          []string{"localbq", "--port=9060", "--data-dir=/data"},
+		DataPath:     "/data", // DuckDB database directory
+	}
 )
 
 // ServiceRegistry maps user-facing service names to their container configs.
@@ -45,6 +53,7 @@ var ServiceRegistry = map[string]ContainerConfig{
 	"bigtable":    BigtableConfig,
 	"cloudsql":    CloudSQLConfig,
 	"memorystore": MemorystoreConfig,
+	"bigquery":    BigQueryConfig,
 }
 
 // WithDataDir returns a copy of the config with volume mounts set for persistence.

@@ -258,6 +258,7 @@
       <a href="/docs/bigtable.html" class="sidebar-link">Bigtable</a>
       <a href="/docs/cloud-sql.html" class="sidebar-link">Cloud SQL</a>
       <a href="/docs/memorystore.html" class="sidebar-link">Memorystore</a>
+      <a href="/docs/bigquery.html" class="sidebar-link">BigQuery</a>
     </aside>
 
     <main class="content">
@@ -442,6 +443,13 @@
             <td><code>--port-memorystore</code></td>
             <td>(standard Redis)</td>
           </tr>
+          <tr>
+            <td><a href="/docs/bigquery.html">BigQuery</a></td>
+            <td>REST</td>
+            <td><code>9060</code></td>
+            <td><code>--port-bigquery</code></td>
+            <td><code>CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGQUERY</code></td>
+          </tr>
         </tbody>
       </table>
 
@@ -494,9 +502,9 @@
 
       <h2>Data persistence</h2>
 
-      <p>Native services persist data via <code>--data-dir</code>. Orchestrated services that support persistence (Cloud SQL and Memorystore) also mount volumes when <code>--data-dir</code> is set:</p>
+      <p>Native services persist data via <code>--data-dir</code>. Orchestrated services that support persistence (Cloud SQL, Memorystore, and BigQuery) also mount volumes when <code>--data-dir</code> is set:</p>
 
-<pre class="code-block"><span class="prompt">$</span> localgcp up --data-dir=./.localgcp --services=cloudsql,memorystore</pre>
+<pre class="code-block"><span class="prompt">$</span> localgcp up --data-dir=./.localgcp --services=cloudsql,memorystore,bigquery</pre>
 
       <p>Spanner and Bigtable emulators are ephemeral only (the official emulators don't support disk persistence).</p>
 
