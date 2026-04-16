@@ -3,12 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>localgcp - The unified GCP emulator</title>
-  <meta name="description" content="One binary, fourteen services, zero cloud bills. Emulate Spanner, Firestore, Pub/Sub, Vertex AI, Cloud Storage, KMS, and more locally.">
-  <meta property="og:title" content="localgcp - The unified GCP emulator">
-  <meta property="og:description" content="One binary, fourteen services, zero cloud bills. Nine native Go services plus Spanner, Bigtable, Cloud SQL, Redis, and BigQuery via Docker.">
+  <title>localgcp — LocalStack for GCP. Run Google Cloud locally.</title>
+  <meta name="description" content="localgcp is the open-source GCP emulator — LocalStack for Google Cloud. One Go binary runs 14 services locally: Vertex AI, BigQuery, Spanner, Firestore, Pub/Sub, Cloud Storage, Bigtable, Cloud SQL, Memorystore, Cloud Tasks, KMS, Secret Manager, Cloud Run, Cloud Logging. Zero cloud bills, zero API keys, works offline.">
+  <meta name="keywords" content="gcp emulator, google cloud emulator, localstack for gcp, local gcp, gcp local development, vertex ai emulator, bigquery emulator, spanner emulator, firestore emulator, pubsub emulator, cloud storage emulator, gcp mock, gcp offline, google cloud locally, localgcp">
+  <meta name="author" content="yogirk">
+  <meta property="og:title" content="localgcp — LocalStack for GCP. Run Google Cloud locally.">
+  <meta property="og:description" content="The open-source GCP emulator. One Go binary. Fourteen Google Cloud services on localhost — Vertex AI, BigQuery, Spanner, Firestore, Pub/Sub, Cloud Storage and more. Zero cloud bills.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://localgcp.com">
+  <meta property="og:site_name" content="localgcp">
+  <meta property="og:image" content="https://localgcp.com/favicon.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="localgcp — LocalStack for GCP">
+  <meta name="twitter:description" content="Run 14 Google Cloud services locally from a single Go binary. Vertex AI, BigQuery, Spanner, Firestore, Pub/Sub and more. Zero cloud bills.">
+  <meta name="twitter:image" content="https://localgcp.com/favicon.svg">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="canonical" href="https://localgcp.com/">
   <script type="application/ld+json">
@@ -16,11 +24,15 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "localgcp",
-    "description": "The unified GCP emulator. Fourteen services, one binary, zero cloud bills. Nine native Go services plus Spanner, Bigtable, Cloud SQL, Redis, and BigQuery via Docker orchestration.",
+    "alternateName": ["local gcp", "LocalStack for GCP", "GCP emulator"],
+    "description": "Open-source Google Cloud emulator. One Go binary emulating 14 GCP services locally: Vertex AI, BigQuery, Spanner, Firestore, Pub/Sub, Cloud Storage, Bigtable, Cloud SQL, Memorystore, Cloud Tasks, KMS, Secret Manager, Cloud Run, Cloud Logging. The LocalStack equivalent for Google Cloud Platform.",
     "applicationCategory": "DeveloperApplication",
+    "applicationSubCategory": "Cloud Emulator",
     "operatingSystem": "macOS, Linux, Windows",
     "url": "https://localgcp.com",
     "downloadUrl": "https://github.com/slokam-ai/localgcp/releases",
+    "codeRepository": "https://github.com/slokam-ai/localgcp",
+    "programmingLanguage": "Go",
     "softwareVersion": "0.5.1",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
@@ -32,7 +44,113 @@
       "@type": "Offer",
       "price": "0",
       "priceCurrency": "USD"
-    }
+    },
+    "keywords": "gcp emulator, google cloud emulator, localstack for gcp, local gcp, vertex ai emulator, bigquery emulator"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Is there a LocalStack for Google Cloud?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. localgcp is the LocalStack equivalent for Google Cloud Platform. It is a single open-source Go binary that runs 14 GCP services on localhost: Vertex AI, BigQuery, Spanner, Firestore, Pub/Sub, Cloud Storage, Bigtable, Cloud SQL, Memorystore, Cloud Tasks, Cloud KMS, Secret Manager, Cloud Run, and Cloud Logging. Your existing GCP client libraries work unchanged by pointing them at localhost via the standard emulator host environment variables."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I run Google Cloud locally?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Install localgcp with 'brew install slokam-ai/tap/localgcp', then run 'localgcp up' to start all native services, and 'eval $(localgcp env)' to point your GCP client libraries at the local emulator. Alternatively, install from source with 'go install github.com/slokam-ai/localgcp/cmd/localgcp@latest' or run the Docker image at ghcr.io/slokam-ai/localgcp."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Google Cloud provide a local emulator?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Google ships fragmented emulators for a subset of services (Pub/Sub, Firestore, Spanner, Bigtable, Datastore) but has no unified local environment, no Cloud Storage emulator, no Vertex AI emulator, and no Cloud Tasks emulator. localgcp unifies this gap by providing a single binary that emulates 14 services, including the ones Google does not."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I run Vertex AI locally without an API key?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. localgcp includes a Vertex AI emulator that proxies generateContent and embeddings requests to Ollama-hosted local models such as Gemma or Llama. The official google.golang.org/genai client works unchanged — just set HTTPOptions.BaseURL to http://localhost:8090. With Ollama running you get real inference; without it you get deterministic stub responses suitable for CI/CD."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is there a BigQuery emulator?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. localgcp includes a BigQuery emulator (LocalBQ) that is DuckDB-powered and exposes the BigQuery REST API on port 9060. It works with the bq CLI, the Python SDK, and the Go SDK. It runs via Docker orchestration because of native DuckDB dependencies."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does localgcp compare to LocalStack?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "LocalStack emulates AWS services. localgcp emulates Google Cloud Platform services. Both let you develop and test cloud applications without hitting real cloud APIs or paying cloud bills. localgcp is MIT licensed, ships as a single Go binary (no Python, no Docker required for native services), and starts in under 100ms."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is localgcp free and open source?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. localgcp is MIT licensed and fully open source on GitHub at github.com/slokam-ai/localgcp. There is no paid tier, no cloud lock-in, no telemetry."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which GCP services does localgcp emulate?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "localgcp emulates 14 services. Nine run natively in Go with zero dependencies: Cloud Storage, Pub/Sub, Secret Manager, Firestore, Cloud Tasks, Vertex AI, Cloud KMS, Cloud Logging, Cloud Run. Five run via Docker orchestration with lazy startup: Spanner, Bigtable, Cloud SQL (Postgres), Memorystore (Redis), and BigQuery."
+        }
+      }
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to run Google Cloud locally with localgcp",
+    "description": "Install localgcp, start the emulator, and point your GCP client libraries at localhost.",
+    "totalTime": "PT2M",
+    "tool": [
+      { "@type": "HowToTool", "name": "Homebrew" },
+      { "@type": "HowToTool", "name": "Go" }
+    ],
+    "step": [
+      {
+        "@type": "HowToStep",
+        "position": 1,
+        "name": "Install localgcp",
+        "text": "Install via Homebrew: brew install slokam-ai/tap/localgcp. Alternatively use 'go install github.com/slokam-ai/localgcp/cmd/localgcp@latest' or download a prebuilt binary from the releases page."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 2,
+        "name": "Start the emulator",
+        "text": "Run 'localgcp up' to start all native services in the foreground. Add '--services=spanner,bigtable,cloudsql,memorystore,bigquery' to include Docker-orchestrated services."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 3,
+        "name": "Connect your application",
+        "text": "Run 'eval $(localgcp env)' to export the standard GCP emulator host environment variables. Your existing GCP client libraries (Go, Python, Java, Node.js) now talk to localhost instead of Google Cloud."
+      }
+    ]
   }
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -281,6 +399,34 @@
     }
     .cta-install a { color: var(--saffron); }
 
+    /* FAQ */
+    .faq { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
+    .faq-item {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.1rem 1.4rem; transition: border-color 0.2s;
+    }
+    .faq-item:hover { border-color: var(--border-light); }
+    .faq-item summary {
+      cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500; font-size: 1rem; color: var(--text-primary);
+      list-style: none; position: relative; padding-right: 1.5rem;
+    }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after {
+      content: '+'; position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+      font-family: 'JetBrains Mono', monospace; color: var(--saffron);
+      font-size: 1.25rem; transition: transform 0.2s;
+    }
+    .faq-item[open] summary::after { content: '\2013'; }
+    .faq-item p {
+      margin-top: 0.9rem; margin-bottom: 0; font-size: 0.9rem;
+      color: var(--text-secondary); line-height: 1.75;
+    }
+    .faq-item code {
+      background: var(--code-bg); border: 1px solid var(--code-border);
+      padding: 1px 6px; border-radius: 4px; font-size: 0.8rem; color: var(--text-primary);
+    }
+
     footer { border-top: 1px solid var(--border); padding: 2.5rem 0; text-align: center; }
     footer p { font-size: 0.8rem; color: var(--text-dim); }
     footer a { color: var(--saffron); }
@@ -337,10 +483,10 @@
 
       <section class="hero">
         <h1>localgcp</h1>
-        <div class="hero-tagline">{ the unified GCP emulator }</div>
+        <div class="hero-tagline">{ LocalStack for GCP }</div>
         <p class="hero-desc">
-          One binary, fourteen services, zero cloud bills.
-          Nine native Go services start in under 100ms. Four more via Docker, on demand.
+          Run Google Cloud locally. One Go binary, fourteen services, zero cloud bills.
+          Nine native services start in under 100ms. Five more via Docker, on demand.
         </p>
         <div class="hero-highlight">
           <strong>BigQuery, Vertex AI, Spanner, Bigtable, and 10 more.</strong> Native services need zero dependencies.
@@ -588,7 +734,95 @@
         <div class="quote">
           AWS has LocalStack. GCP had nothing equivalent.
           Fragmented emulators, inconsistent APIs, missing services.
-          Until now.
+          localgcp is the LocalStack for Google Cloud &mdash; one open-source binary, every service your app uses.
+        </div>
+      </section>
+
+      <div class="divider">?</div>
+
+      <section>
+        <div class="section-label">FAQ</div>
+        <h2>Frequently asked questions</h2>
+        <p>
+          The short answers to the questions developers ask when they search for a way to run Google Cloud locally.
+        </p>
+
+        <div class="faq">
+          <details class="faq-item" open>
+            <summary>Is there a LocalStack for Google Cloud?</summary>
+            <p>
+              Yes. <strong>localgcp</strong> is the LocalStack equivalent for Google Cloud Platform.
+              It is a single open-source Go binary that emulates fourteen GCP services on localhost &mdash;
+              Vertex AI, BigQuery, Spanner, Firestore, Pub/Sub, Cloud Storage, Bigtable, Cloud SQL,
+              Memorystore, Cloud Tasks, Cloud KMS, Secret Manager, Cloud Run, and Cloud Logging.
+              Your existing GCP client libraries work unchanged &mdash; point them at localhost via the
+              standard emulator host environment variables.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>How do I run Google Cloud locally?</summary>
+            <p>
+              Install with <code>brew install slokam-ai/tap/localgcp</code>, start the emulator with
+              <code>localgcp up</code>, then run <code>eval $(localgcp env)</code> to export the
+              standard GCP emulator host variables. You can also install from source with
+              <code>go install github.com/slokam-ai/localgcp/cmd/localgcp@latest</code> or run the
+              Docker image at <code>ghcr.io/slokam-ai/localgcp</code>.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Does Google Cloud provide a local emulator?</summary>
+            <p>
+              Google ships fragmented emulators for a subset of services (Pub/Sub, Firestore, Spanner,
+              Bigtable, Datastore) but has no unified local environment, no Cloud Storage emulator,
+              no Vertex AI emulator, and no Cloud Tasks emulator. localgcp fills this gap with one
+              binary that covers fourteen services &mdash; including the ones Google does not.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I run Vertex AI locally without an API key?</summary>
+            <p>
+              Yes. The Vertex AI emulator in localgcp proxies <code>generateContent</code> and
+              embeddings calls to Ollama-hosted local models (Gemma, Llama, or any model you pull).
+              The official <code>google.golang.org/genai</code> client works unchanged &mdash; just set
+              <code>HTTPOptions.BaseURL</code> to <code>http://localhost:8090</code>. Without Ollama
+              running, localgcp returns deterministic stub responses suitable for CI/CD.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Is there a BigQuery emulator?</summary>
+            <p>
+              Yes. localgcp bundles a DuckDB-powered BigQuery emulator (<a href="https://github.com/slokam-ai/localbq">LocalBQ</a>)
+              that exposes the BigQuery REST API on port 9060. It works with the <code>bq</code> CLI,
+              the Python SDK, and the Go SDK. It runs via Docker orchestration to isolate native
+              DuckDB dependencies from the main binary.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>How does localgcp compare to LocalStack?</summary>
+            <p>
+              LocalStack emulates AWS. localgcp emulates GCP. Both let you develop and test cloud
+              applications without hitting real cloud APIs or paying cloud bills. localgcp is
+              MIT licensed, ships as a single Go binary (no Python, no Docker required for native
+              services), and starts in under 100ms.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Is localgcp free and open source?</summary>
+            <p>
+              Yes. MIT licensed, fully open source at
+              <a href="https://github.com/slokam-ai/localgcp">github.com/slokam-ai/localgcp</a>.
+              No paid tier, no cloud lock-in, no telemetry.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Which languages and SDKs work with localgcp?</summary>
+            <p>
+              Any official Google Cloud client library that honors the standard emulator host
+              environment variables &mdash; Go, Python, Java, Node.js, Ruby, .NET, PHP. For services
+              without an env var convention (Secret Manager, KMS, Cloud Run, Vertex AI, Cloud Tasks,
+              Cloud Logging), set the endpoint manually on the client.
+            </p>
+          </details>
         </div>
       </section>
 

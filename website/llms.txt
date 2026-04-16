@@ -1,58 +1,105 @@
 # localgcp
 
-> The unified GCP emulator. One binary, fourteen services, zero cloud bills.
+> The LocalStack for Google Cloud. One Go binary emulating 14 GCP services locally. Zero cloud bills, zero API keys, works offline.
 
-localgcp is an open source Go binary that emulates Google Cloud Platform services locally for development and testing. It replaces fragmented emulator setups with a single command.
+localgcp is the open-source Google Cloud Platform emulator. It runs 14 GCP services on localhost from a single Go binary, so developers can build, test, and CI/CD cloud applications without hitting real Google Cloud APIs or paying cloud bills.
 
-## Services
+## Quick facts
 
-Nine services are implemented natively in Go (zero dependencies):
-- Cloud Storage (REST, port 4443)
-- Pub/Sub (gRPC, port 8085)
-- Secret Manager (gRPC, port 8086)
-- Firestore (gRPC, port 8088)
-- Cloud Tasks (gRPC, port 8089)
-- Vertex AI (REST, port 8090) — supports Ollama, OpenAI, Anthropic backends
-- Cloud KMS (gRPC, port 8091)
-- Cloud Logging (gRPC, port 8092)
-- Cloud Run (gRPC, port 8093)
+- **What it is**: open-source GCP emulator (MIT licensed)
+- **How it runs**: single Go binary; nine services native, five via Docker orchestration
+- **Startup**: under 100ms for native services
+- **Language support**: any official GCP client library (Go, Python, Java, Node.js, Ruby, .NET, PHP)
+- **Repo**: https://github.com/slokam-ai/localgcp
+- **Site**: https://localgcp.com
+- **Install**: `brew install slokam-ai/tap/localgcp`
 
-Five services are orchestrated via Docker containers (opt-in, lazy startup):
-- Spanner (gRPC, port 9010) — official Google emulator
-- Bigtable (gRPC, port 9094) — official Google emulator
-- Cloud SQL (TCP, port 5432) — PostgreSQL 16
-- Memorystore (TCP, port 6379) — Redis 7
-- BigQuery (REST, port 9060) — DuckDB-powered emulator (LocalBQ)
+## Common questions and answers
 
-## Quick Start
+### Is there a LocalStack for Google Cloud?
+Yes. localgcp is the LocalStack equivalent for GCP. One binary emulates 14 services: Vertex AI, BigQuery, Spanner, Firestore, Pub/Sub, Cloud Storage, Bigtable, Cloud SQL, Memorystore, Cloud Tasks, Cloud KMS, Secret Manager, Cloud Run, and Cloud Logging.
 
+### How do I run Google Cloud locally?
 ```bash
 brew install slokam-ai/tap/localgcp
 localgcp up
 eval $(localgcp env)
 ```
+Your existing GCP client libraries now talk to localhost.
 
-For orchestrated services (requires Docker):
-```bash
-localgcp up --services=spanner,bigtable,cloudsql,memorystore
-```
+### Does Google provide an official local GCP emulator?
+Google ships emulators for a subset of services (Pub/Sub, Firestore, Spanner, Bigtable, Datastore) but has no unified emulator, no Cloud Storage emulator, no Vertex AI emulator, and no Cloud Tasks emulator. localgcp unifies and fills those gaps.
 
-## Key Features
+### How do I run Vertex AI locally?
+localgcp's Vertex AI emulator proxies `generateContent` and embeddings calls to Ollama-hosted local models. The official `google.golang.org/genai` client works unchanged — set `HTTPOptions.BaseURL` to `http://localhost:8090`. Without Ollama running, the emulator returns deterministic stub responses for CI/CD.
+
+### Is there a BigQuery emulator?
+Yes. localgcp bundles LocalBQ, a DuckDB-powered BigQuery emulator that exposes the BigQuery REST API on port 9060. Works with `bq` CLI, Python SDK, Go SDK.
+
+### How does localgcp compare to LocalStack?
+LocalStack emulates AWS. localgcp emulates GCP. Both eliminate cloud bills and API keys during development and testing. localgcp is MIT licensed, distributed as a single Go binary, and starts in under 100ms.
+
+### Is localgcp free?
+Yes. MIT licensed, fully open source. No paid tier, no telemetry.
+
+## Services emulated
+
+Native (Go, zero dependencies):
+- Cloud Storage — REST, port 4443
+- Pub/Sub — gRPC, port 8085
+- Secret Manager — gRPC, port 8086
+- Firestore — gRPC, port 8088
+- Cloud Tasks — gRPC, port 8089
+- Vertex AI — REST, port 8090 (Ollama, OpenAI, Anthropic backends)
+- Cloud KMS — gRPC, port 8091
+- Cloud Logging — gRPC, port 8092
+- Cloud Run — gRPC, port 8093
+
+Orchestrated (Docker, lazy start):
+- Spanner — gRPC, port 9010 (official Google emulator)
+- Bigtable — gRPC, port 9094 (official Google emulator)
+- Cloud SQL — TCP, port 5432 (PostgreSQL 16)
+- Memorystore — TCP, port 6379 (Redis 7)
+- BigQuery — REST, port 9060 (LocalBQ, DuckDB-backed)
+
+## Key features
 
 - Sub-100ms startup for native services
-- Lazy Docker orchestration: containers start only on first connection
-- Works with official GCP client libraries (Go, Python, Java, Node.js)
-- Vertex AI with local LLM inference via Ollama
-- In-memory by default, optional persistence via --data-dir
-- CI/CD ready: no credentials needed
+- Lazy Docker orchestration — containers start only on first connection
+- Works with official GCP client libraries via the standard `*_EMULATOR_HOST` env vars
+- Vertex AI proxy to local LLMs via Ollama
+- In-memory by default, optional persistence via `--data-dir`
+- CI/CD ready — no credentials, no API keys, no network access needed
+
+## Install
+
+```bash
+# macOS / Linux (Homebrew)
+brew install slokam-ai/tap/localgcp
+
+# Go
+go install github.com/slokam-ai/localgcp/cmd/localgcp@latest
+
+# Docker
+docker run --rm -p 4443:4443 -p 8085-8093:8085-8093 ghcr.io/slokam-ai/localgcp
+
+# All services including Docker-orchestrated
+localgcp up --services=spanner,bigtable,cloudsql,memorystore,bigquery
+```
 
 ## Links
 
-- Website: https://localgcp.com
+- Homepage: https://localgcp.com
 - Documentation: https://localgcp.com/docs/
-- GitHub: https://github.com/slokam-ai/localgcp
-- Install: brew install slokam-ai/tap/localgcp
+- Source code: https://github.com/slokam-ai/localgcp
+- Roadmap: https://github.com/slokam-ai/localgcp/blob/main/ROADMAP.md
+- Releases: https://github.com/slokam-ai/localgcp/releases
+- BigQuery emulator (LocalBQ): https://github.com/slokam-ai/localbq
 
 ## License
 
-MIT
+MIT. Built by yogirk (https://github.com/yogirk).
+
+## Keywords
+
+gcp emulator, google cloud emulator, localstack for gcp, local gcp, gcp local development, vertex ai emulator, bigquery emulator, spanner emulator, firestore emulator, pubsub emulator, cloud storage emulator, gcp mock, gcp offline, google cloud locally, ollama gemini, genai local
